@@ -66,9 +66,9 @@ you run the command in, so the same file is also at `.streamlit/config.toml` in 
 python reports/build_report.py
 ```
 
-This writes `reports/F1_EDA_Report.pdf` from the figures. To add the dashboard screenshots, save
-them as `reports/screenshots/dashboard_1.png`, `dashboard_2.png` and `dashboard_3.png` and run the
-script again. Until then the report shows marked placeholders.
+This writes `reports/F1_EDA_Report.pdf` from the figures and the dashboard screenshots in
+`reports/screenshots/` (`dashboard_1.png`, `dashboard_2.png`, `dashboard_3.png`). To use new
+screenshots, replace those files and run the script again.
 
 ## Presentation
 
