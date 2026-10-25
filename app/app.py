@@ -61,12 +61,14 @@ df = load_data()
 
 # ------------------------------------------------------------------ sidebar
 st.sidebar.title("🏁 F1 1950–2024")
+st.sidebar.header("About the data")
 st.sidebar.markdown(
     "Every Formula 1 World Championship race result from 1950 to 2024, one row per driver per race. "
     "Data: [Kaggle, Rohan Rao](https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020) "
     "(from the Ergast API)."
 )
 
+st.sidebar.header("Filters")
 years = st.sidebar.slider("Seasons", 1950, 2024, (2010, 2024))
 in_years = df[df["year"].between(*years)]
 

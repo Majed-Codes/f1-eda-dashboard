@@ -162,11 +162,17 @@ story += [p("1. Introduction", h1), p("Dataset", h2),
           p("I picked this dataset because I am an F1 fan and already had questions about the sport. It is also "
             "a real relational dataset, so the tables have to be joined by ID and there is real cleaning work to do."),
           p("Problem definition", h2),
+          p("The dataset covers every Formula 1 World Championship race from 1950 to 2024: who started where, "
+            "who finished where, the points scored, and why a driver retired if they did not finish."),
           p("<b>Main question: is the race decided on Saturday?</b> In other words, how much does qualifying "
             "(grid position) decide the result on Sunday?"),
           *bullets(["How strongly does grid position predict finishing position, and has that link grown stronger since 2010?",
                     "Does one constructor dominate each era?",
                     "Have cars become more reliable (fewer DNFs, fewer mechanical failures)?"]),
+          p("Insights I expect to find", h2),
+          *bullets(["Pole position wins a large share of races, and the grid matters more in the modern era.",
+                    "Each era has one team that wins far more than the rest.",
+                    "DNF rates fall a lot over time, mostly because cars break down less."]),
           p("For the grid vs result questions I use 2010-2024, because the cars and rules in that period are more "
             "comparable. For reliability and dominance I use the full 1950-2024 range. All 75 seasons are complete."),
           PageBreak()]
