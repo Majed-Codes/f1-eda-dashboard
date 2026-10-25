@@ -1,0 +1,8 @@
+# raw Kaggle CSVs (about 21 MB), see README for how to download them
+data/raw/
+
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store
+.claude/
