@@ -2,7 +2,7 @@
 
 Unit 3 final project
 
-- Dashboard: https://f1-eda-dashboard-q4ra9nh4rp59mufhrbpm4r.streamlit.app
+- Application: https://f1-eda-dashboard-q4ra9nh4rp59mufhrbpm4r.streamlit.app
 - Presentation: https://majed-codes.github.io/f1-eda-dashboard/presentation/
 
 EDA on every F1 race from 1950 to 2024, checking how much qualifying decides the result.
