@@ -292,8 +292,9 @@ story += [p("5. Dashboard Overview", h1),
                     "podiums per season.",
                     "<b>Predict tab:</b> pick a grid slot, team and season and the logistic regression gives a podium "
                     "chance, with the chance from every grid slot shown as a bar chart.",
-                    "<b>Play tab:</b> a mini game called Podium or Not? It shows a real 2010-2024 start and the user "
-                    "guesses if it ended on the podium, competing against the model over 10 rounds.",
+                    "<b>Play tab:</b> three F1 mini games built on real grids and results (Lights Out reaction starts, "
+                    "Pit Stop, and Grid Dash, a top-down race from a real grid slot). They can be played solo, by two "
+                    "players on one device, or as an online championship that friends join from their phones.",
                     "<b>Polly:</b> a chibi assistant powered by Claude who floats over the page. She can be dragged "
                     "anywhere, and a double-click opens a chat window. She answers questions about the data by calling "
                     "tools that query clean_data.csv, so the numbers come from the data and not from memory.",

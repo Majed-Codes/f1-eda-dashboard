@@ -74,10 +74,19 @@ ANTHROPIC_API_KEY = "your-key-here"
 The file is in `.gitignore`, so the key is never committed. Without a key the rest of the dashboard still works and
 Polly explains how to add one. Each question costs a few cents of API credit.
 
-### Podium or Not? (mini game)
+### Lights Out Arcade (mini games)
 
-The **Play** tab shows a real start from 2010-2024 (driver, team, grid slot). Guess if it ended on the podium and try
-to beat the podium model over 10 rounds.
+The **Play** tab has three F1 mini games that use the real grids and results:
+
+- **Lights Out**: react when the five start lights go out. Your reaction turns into places gained or lost from a
+  real grid slot, with the real podium chance from your new position.
+- **Pit Stop**: change the tyre that lights up, in order, then release the car.
+- **Grid Dash**: take a real driver's seat on a real 2000-2024 grid and race the field in their team colours, then
+  see what that driver really did.
+
+Play alone, 2 players on one device (shared keyboard or split screen), or an **online championship**: the host
+creates a room, friends on the same Wi-Fi scan the QR code, every round is played at the same moment on every phone,
+and F1 points (10, 8, 6...) decide the champion.
 
 ## Build the PDF report
 

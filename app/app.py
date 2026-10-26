@@ -277,8 +277,10 @@ stat_row([
     stat_card('DNF rate among starters', pct(dnf_rate), versus(dnf_rate, 'dnf')),
 ])
 
+# a game invite link (?room=CODE) opens straight on the Play tab
 tab_q, tab_d, tab_r, tab_driver, tab_p, tab_play, tab_data = st.tabs(
-    ['Qualifying', 'Dominance', 'Reliability', 'Drivers', 'Predict', 'Play', 'Data'])
+    ['Qualifying', 'Dominance', 'Reliability', 'Drivers', 'Predict', 'Play', 'Data'],
+    default='Play' if st.query_params.get('room') else None)
 
 # ---------------- qualifying ----------------
 with tab_q:

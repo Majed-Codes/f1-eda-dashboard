@@ -1,0 +1,503 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lights Out Arcade</title>
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; -webkit-user-select: none;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; color: #F5F5F7; }
+  #wrap { position: relative; border-radius: 22px; overflow: hidden; background: #0E0E12;
+    border: 1px solid rgba(255,255,255,0.08); outline: none; }
+  canvas { display: block; width: 100%; touch-action: none; }
+  #ov { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; gap: 10px; padding: 20px; background: rgba(10,10,12,0.74); backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px); }
+  #ov h2 { margin: 0; font-size: 30px; letter-spacing: -0.02em; }
+  #ov p { margin: 0; color: #A1A1A6; font-size: 15px; max-width: 460px; line-height: 1.5; }
+  #ov .big { font-size: 56px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
+  #ov table { border-collapse: collapse; font-size: 15px; margin-top: 4px; }
+  #ov td { padding: 4px 12px; color: #D1D1D6; }
+  #ov td b { color: #F5F5F7; }
+  .btn { margin-top: 8px; background: #FF2B17; color: #fff; border: 0; border-radius: 12px; padding: 12px 28px;
+    font-size: 16px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .btn:hover { filter: brightness(1.1); }
+  .k { display: inline-block; min-width: 14px; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px;
+    padding: 1px 7px; margin: 0 2px; color: #F5F5F7; font-size: 13px; font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="wrap" tabindex="0"><canvas id="c"></canvas><div id="ov"></div></div>
+<script>
+// ------------------------------------------------------------------ talking to Streamlit
+const Stl = {
+  send(type, data) { window.parent.postMessage(Object.assign({ isStreamlitMessage: true, type: type }, data || {}), '*'); },
+  ready() { this.send('streamlit:componentReady', { apiVersion: 1 }); },
+  value(v) { this.send('streamlit:setComponentValue', { value: v, dataType: 'json' }); },
+  height(h) { this.send('streamlit:setFrameHeight', { height: h }); },
+};
+
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const wrap = document.getElementById('wrap'), ov = document.getElementById('ov');
+let W = 700, H = 400, ARGS = null, GAME = null, clockOffset = 0;
+const RED = '#FF2B17', INK = '#F5F5F7', MUTED = '#A1A1A6', FAINT = '#6E6E73';
+
+function resize(h) {
+  W = Math.max(280, wrap.clientWidth || document.body.clientWidth || 700);
+  H = h;
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = W * dpr; cv.height = H * dpr; cv.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  Stl.height(H + 2);
+}
+window.addEventListener('resize', () => { if (GAME) { resize(H); } });
+
+function serverNow() { return Date.now() + clockOffset; }
+function rng(seed) {   // mulberry32: same seed, same sequence on every device
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function overlay(html, button, onClick) {
+  ov.innerHTML = html + (button ? '<button class="btn" id="ovb">' + button + '</button>' : '');
+  ov.style.display = 'flex';
+  if (button) document.getElementById('ovb').onclick = e => { e.stopPropagation(); hideOverlay(); wrap.focus(); onClick(); };
+}
+function hideOverlay() { ov.style.display = 'none'; }
+function finish(results) { Stl.value({ nonce: ARGS.nonce, game: ARGS.game, results: results }); }
+function fmt(ms) { return (ms / 1000).toFixed(3) + 's'; }
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+function text(s, x, y, size, color, weight, align) {
+  ctx.font = (weight || 600) + ' ' + size + 'px -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif';
+  ctx.fillStyle = color || INK; ctx.textAlign = align || 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(s, x, y);
+}
+
+// Online rounds start at the same server time on every phone.
+function startWhenScheduled(go) {
+  if (!ARGS.start_at) { go(); return; }
+  const tick = () => {
+    const left = ARGS.start_at - serverNow();
+    if (left <= 0) { hideOverlay(); wrap.focus(); go(); return; }
+    ov.innerHTML = '<p>Tap here so your keys and taps reach the game</p><div class="big">' + Math.ceil(left / 1000) +
+                   '</div><p>Get ready…</p>';
+    ov.style.display = 'flex';
+    setTimeout(tick, 100);
+  };
+  tick();
+}
+
+// ------------------------------------------------------------------ input
+const keysDown = new Set();
+window.addEventListener('keydown', e => {
+  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) e.preventDefault();
+  if (e.repeat) return;
+  keysDown.add(e.key.toLowerCase());
+  if (GAME && GAME.key) GAME.key(e.key.toLowerCase());
+});
+window.addEventListener('keyup', e => keysDown.delete(e.key.toLowerCase()));
+const touches = new Map();
+cv.addEventListener('pointerdown', e => {
+  wrap.focus();
+  const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  touches.set(e.pointerId, x);
+  if (GAME && GAME.tap) GAME.tap(x, y);
+});
+cv.addEventListener('pointermove', e => { if (touches.has(e.pointerId)) touches.set(e.pointerId, e.clientX - cv.getBoundingClientRect().left); });
+['pointerup', 'pointercancel', 'pointerleave'].forEach(t => cv.addEventListener(t, e => touches.delete(e.pointerId)));
+wrap.addEventListener('pointerdown', () => wrap.focus());
+
+// ------------------------------------------------------------------ drawing helpers
+function drawCar(x, y, color, s, up) {      // top-down F1 car centred on (x, y); points up when up = true
+  ctx.save(); ctx.translate(x, y); if (!up) ctx.rotate(Math.PI / 2); ctx.scale(s, s);
+  ctx.fillStyle = '#0b0b0e';
+  [[-13, -15], [9, -15], [-13, 8], [9, 8]].forEach(([wx, wy]) => { rr(wx, wy, 6, 10, 2); ctx.fill(); });
+  ctx.fillStyle = color;
+  rr(-12, -24, 24, 4, 1.5); ctx.fill();                       // front wing
+  rr(-10, 18, 20, 5, 1.5); ctx.fill();                        // rear wing
+  ctx.beginPath(); ctx.moveTo(-2.5, -22); ctx.lineTo(2.5, -22); ctx.lineTo(7, 0); ctx.lineTo(8, 14);
+  ctx.lineTo(-8, 14); ctx.lineTo(-7, 0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#0b0b0e'; ctx.beginPath(); ctx.ellipse(0, 1, 3.4, 5.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#F5F5F7'; ctx.beginPath(); ctx.arc(0, 2, 2.2, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+// ================================================================== LIGHTS OUT
+function makeLights(a) {
+  const P = a.players, two = P.length === 2, R = rng(a.seed);
+  const attempts = two ? 5 : 3, holds = [];
+  for (let i = 0; i < attempts; i++) holds.push(250 + R() * 2700);
+  const res = P.map(() => ({ times: [], jumps: 0, wins: 0 }));
+  let n = 0, state = 'idle', t0 = 0, outAt = 0, react = [], verdict = '';
+  const STEP = 900;
+
+  function begin() { state = 'seq'; t0 = performance.now(); react = P.map(() => null); verdict = ''; }
+  function allIn() { return react.every(r => r !== null); }
+  function press(pi) {
+    if (pi >= P.length || react[pi] !== null) return;
+    if (state === 'seq') { react[pi] = 'jump'; res[pi].jumps++; if (allIn()) end(); }
+    else if (state === 'out') { react[pi] = performance.now() - outAt; if (allIn()) end(); }
+  }
+  function end() {
+    state = 'result';
+    react.forEach((r, i) => res[i].times.push(typeof r === 'number' ? Math.round(r) : null));
+    if (two) {
+      const v = react.map(r => typeof r === 'number' ? r : Infinity);
+      if (v[0] !== v[1] && (v[0] < Infinity || v[1] < Infinity)) { const w = v[0] < v[1] ? 0 : 1; res[w].wins++; verdict = P[w].name + ' takes the round!'; }
+      else verdict = 'Nobody gets this one!';
+    }
+    setTimeout(next, 2200);
+  }
+  function next() {
+    n++;
+    if (n < attempts) { begin(); return; }
+    state = 'done';
+    const results = P.map((p, i) => {
+      const ok = res[i].times.filter(t => t !== null);
+      return { name: p.name, best_ms: ok.length ? Math.min(...ok) : null, times: res[i].times, jumps: res[i].jumps, wins: res[i].wins };
+    });
+    let html = '<h2>' + (two ? (results[0].wins === results[1].wins ? 'A dead heat!' :
+               (results[0].wins > results[1].wins ? results[0].name : results[1].name) + ' wins!') : 'Session over') + '</h2><table>';
+    results.forEach(r => { html += '<tr><td>' + r.name + '</td><td>best <b>' + (r.best_ms ? fmt(r.best_ms) : 'no valid start') +
+      '</b></td><td>' + (two ? r.wins + ' rounds' : r.jumps + ' jump starts') + '</td></tr>'; });
+    overlay(html + '</table>');
+    finish(results);
+  }
+  return {
+    get state() { return state; },
+    height: 400,
+    init() {
+      const how = two ? P[0].name + ' presses <span class="k">A</span> or taps the left half · ' + P[1].name +
+                        ' presses <span class="k">L</span> or taps the right half'
+                      : 'Press <span class="k">Space</span> or tap the moment the lights go out';
+      overlay('<h2>🚦 Lights Out</h2><p>Five red lights come on one by one. When they all go out, react! Go too early and it is a jump start. ' +
+              attempts + ' starts.</p><p>' + how + '</p>', ARGS.start_at ? null : 'Start', begin);
+      if (ARGS.start_at) startWhenScheduled(begin);
+    },
+    key(k) {
+      if (two) { if (k === 'a') press(0); if (k === 'l') press(1); }
+      else if (k === ' ' || k === 'enter') press(0);
+    },
+    tap(x) { if (two) press(x < W / 2 ? 0 : 1); else press(0); },
+    frame(t) {
+      if (state === 'seq') {
+        const lit = Math.min(5, Math.floor((t - t0) / STEP) + 1);
+        if (lit === 5 && t - t0 >= 5 * STEP + holds[n]) { state = 'out'; outAt = t; }
+      } else if (state === 'out' && t - outAt > 1600) {
+        react = react.map(r => r === null ? 1600 : r); end();
+      }
+      ctx.fillStyle = '#0E0E12'; ctx.fillRect(0, 0, W, H);
+      // gantry
+      const unit = Math.min(74, (W - 60) / 5), gx = (W - unit * 5) / 2, gy = 34;
+      ctx.fillStyle = '#1A1A20'; rr(gx - 14, gy - 10, unit * 5 + 28, 16, 6); ctx.fill();
+      const lit = state === 'seq' ? Math.min(5, Math.floor((t - t0) / STEP) + 1) : 0;
+      for (let i = 0; i < 5; i++) {
+        const cx = gx + unit * i + unit / 2;
+        ctx.fillStyle = '#050507'; rr(cx - unit * 0.36, gy, unit * 0.72, unit * 1.9, 10); ctx.fill();
+        for (let j = 0; j < 4; j++) {
+          const on = i < lit && j >= 2;
+          const cy = gy + unit * 0.27 + j * unit * 0.45;
+          ctx.beginPath(); ctx.arc(cx, cy, unit * 0.17, 0, Math.PI * 2);
+          if (on) { ctx.shadowColor = RED; ctx.shadowBlur = 24; ctx.fillStyle = RED; } else { ctx.shadowBlur = 0; ctx.fillStyle = '#1C1C22'; }
+          ctx.fill(); ctx.shadowBlur = 0;
+        }
+      }
+      const ty = gy + unit * 1.9 + 60;
+      text((n + 1 > attempts ? attempts : n + 1) + ' / ' + attempts, W - 20, 18, 13, FAINT, 600, 'right');
+      const lanes = two ? [W / 4, W * 3 / 4] : [W / 2];
+      if (two) { ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.moveTo(W / 2, gy + unit * 1.9 + 20); ctx.lineTo(W / 2, H - 20); ctx.stroke(); }
+      lanes.forEach((x, i) => {
+        if (two) { text(P[i].name + ' (' + (i === 0 ? 'A' : 'L') + ')', x, ty - 26, 14, P[i].color, 700); }
+        const r = react[i];
+        if (state === 'seq') text(r === 'jump' ? 'JUMP START!' : 'Wait for it…', x, ty + 10, two ? 26 : 34, r === 'jump' ? RED : MUTED, 700);
+        else if (state === 'out') text(r === null ? 'GO!' : (r === 'jump' ? 'JUMP START!' : fmt(r)), x, ty + 10, two ? 34 : 54, r === null ? '#30D158' : INK, 800);
+        else if (state === 'result') {
+          const label = r === 'jump' ? 'JUMP START!' : (r >= 1600 ? 'Too slow' : fmt(r));
+          const col = r === 'jump' || r >= 1600 ? RED : (r < 200 ? '#BF5AF2' : (r < 280 ? '#30D158' : '#FFD60A'));
+          text(label, x, ty + 10, two ? 34 : 54, col, 800);
+          if (typeof r === 'number' && r < 1600) text(r < 200 ? 'Purple! Faster than most F1 drivers' : (r < 280 ? 'Great launch' : 'A bit sleepy'), x, ty + 52, 14, MUTED, 500);
+        }
+        if (two) text(res[i].wins + ' rounds won', x, H - 28, 13, MUTED, 500);
+      });
+      if (state === 'result' && two) text(verdict, W / 2, H - 60, 16, INK, 700);
+    },
+  };
+}
+
+// ================================================================== PIT STOP
+function makePit(a) {
+  const P = a.players, two = P.length === 2, R = rng(a.seed), stopsEach = 3;
+  const order = []; for (let k = 0; k < stopsEach; k++) P.forEach((_, i) => order.push(i));
+  const seqs = order.map(() => { const s = [0, 1, 2, 3]; for (let i = 3; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [s[i], s[j]] = [s[j], s[i]]; } return s; });
+  const res = P.map(() => ({ times: [] }));
+  const KEYS = ['q', 'e', 'z', 'c'], LABEL = ['Q', 'E', 'Z', 'C'], NAMES = ['front left', 'front right', 'rear left', 'rear right'];
+  let k = 0, state = 'idle', tStart = 0, idx = 0, penalty = 0, arriveAt = 0, shakeUntil = 0, done = [false, false, false, false], last = 0, total = 0;
+
+  function wheelPos(i) {
+    const cx = W / 2, cy = H / 2 + 14, s = Math.min(1.9, H / 200);
+    const dx = 46 * s, dy = (i < 2 ? -38 : 34) * s;
+    return { x: cx + (i % 2 === 0 ? -dx : dx), y: cy + dy, r: 17 * s };
+  }
+  function goPos() { return { x: W / 2, y: H - 46, w: 150, h: 46 }; }
+  function ready() {
+    state = 'ready'; done = [false, false, false, false]; idx = 0; penalty = 0;
+    const who = order[k];
+    if (two) overlay('<p>Stop ' + (Math.floor(k / 2) + 1) + ' of ' + stopsEach + '</p><h2 style="color:' + P[who].color + '">' + P[who].name + "'s stop</h2>", 'Ready', arrive);
+    else if (k === 0) { arrive(); }
+    else arrive();
+  }
+  function arrive() { state = 'arrive'; arriveAt = performance.now(); }
+  function hit(i) {
+    if (state !== 'work') return;
+    if (i === seqs[k][idx]) { done[i] = true; idx++; if (idx === 4) state = 'release'; }
+    else if (!done[i]) { penalty += 400; shakeUntil = performance.now() + 300; }
+  }
+  function release() {
+    if (state !== 'release') return;
+    total = performance.now() - tStart + penalty; last = Math.round(total);
+    res[order[k]].times.push(last); state = 'stopped';
+    setTimeout(() => { k++; if (k < order.length) ready(); else end(); }, 1700);
+  }
+  function end() {
+    state = 'done';
+    const results = P.map((p, i) => ({ name: p.name, best_ms: Math.min(...res[i].times), times: res[i].times }));
+    let html = '<h2>' + (two ? (results[0].best_ms === results[1].best_ms ? 'Identical stops!' :
+               (results[0].best_ms < results[1].best_ms ? results[0].name : results[1].name) + ' wins!') : 'Box, box, done!') + '</h2><table>';
+    results.forEach(r => { html += '<tr><td>' + r.name + '</td><td>best <b>' + fmt(r.best_ms) + '</b></td><td>' + r.times.map(fmt).join(' · ') + '</td></tr>'; });
+    overlay(html + '</table>');
+    finish(results);
+  }
+  return {
+    get state() { return state; },
+    get target() { return state === 'work' ? seqs[k][idx] : null; },
+    height: 440,
+    init() {
+      overlay('<h2>🔧 Pit Stop</h2><p>Change the tyre that lights up, in order, as fast as you can. Wrong wheel = +0.4s. ' +
+              'Then release the car. ' + stopsEach + ' stops each, best one counts.</p><p>Tap the wheels, or use <span class="k">Q</span>' +
+              '<span class="k">E</span><span class="k">Z</span><span class="k">C</span> then <span class="k">Space</span> to release.</p>' +
+              (two ? '<p>Players take turns on this device.</p>' : ''), ARGS.start_at ? null : 'Start', ready);
+      if (ARGS.start_at) startWhenScheduled(ready);
+    },
+    key(key) { const i = KEYS.indexOf(key); if (i >= 0) hit(i); if (key === ' ' || key === 'enter') release(); },
+    tap(x, y) {
+      for (let i = 0; i < 4; i++) { const w = wheelPos(i); if (Math.hypot(x - w.x, y - w.y) < w.r * 1.7) { hit(i); return; } }
+      const g = goPos(); if (Math.abs(x - g.x) < g.w / 2 && Math.abs(y - g.y) < g.h / 2) release();
+    },
+    frame(t) {
+      ctx.fillStyle = '#0E0E12'; ctx.fillRect(0, 0, W, H);
+      // pit box
+      ctx.strokeStyle = 'rgba(255,214,10,0.5)'; ctx.setLineDash([10, 8]); ctx.lineWidth = 2;
+      rr(W / 2 - 150, 40, 300, H - 110, 14); ctx.stroke(); ctx.setLineDash([]);
+      const s = Math.min(1.9, H / 200);
+      let carY = H / 2 + 14;
+      if (state === 'arrive') {
+        const p = Math.min(1, (t - arriveAt) / 650); carY = -120 + (H / 2 + 134) * (1 - Math.pow(1 - p, 3));
+        if (p >= 1) { state = 'work'; tStart = t; }
+      }
+      if (state === 'idle' || state === 'ready') carY = -200;
+      if (state === 'stopped' || state === 'done') carY = H / 2 + 14 - Math.min(1, (t - tStart - total) / 500) * (H / 2 + 200);
+      const shake = t < shakeUntil ? Math.sin(t / 15) * 6 : 0;
+      ctx.save(); ctx.translate(shake, carY - (H / 2 + 14));
+      drawCar(W / 2, H / 2 + 14, ARGS.players[order[Math.min(k, order.length - 1)]].color, s * 2.4, true);
+      ctx.restore();
+      if (state === 'work' || state === 'release') {
+        for (let i = 0; i < 4; i++) {
+          const w = wheelPos(i), lit = state === 'work' && seqs[k][idx] === i;
+          ctx.beginPath(); ctx.arc(w.x + shake, w.y, w.r * 1.35, 0, Math.PI * 2);
+          ctx.fillStyle = done[i] ? 'rgba(48,209,88,0.25)' : (lit ? 'rgba(255,214,10,0.28)' : 'rgba(255,255,255,0.04)'); ctx.fill();
+          ctx.lineWidth = lit ? 3 : 1.5; ctx.strokeStyle = done[i] ? '#30D158' : (lit ? '#FFD60A' : 'rgba(255,255,255,0.15)'); ctx.stroke();
+          text(done[i] ? '✓' : LABEL[i], w.x + shake + (i % 2 === 0 ? -w.r * 2.4 : w.r * 2.4), w.y, 16, done[i] ? '#30D158' : (lit ? '#FFD60A' : FAINT), 800);
+        }
+        if (state === 'work') text('Change the ' + NAMES[seqs[k][idx]] + ' tyre!', W / 2, 24, 15, '#FFD60A', 700);
+      }
+      const g = goPos();
+      if (state === 'release') {
+        ctx.fillStyle = '#30D158'; ctx.shadowColor = '#30D158'; ctx.shadowBlur = 20; rr(g.x - g.w / 2, g.y - g.h / 2, g.w, g.h, 12); ctx.fill(); ctx.shadowBlur = 0;
+        text('GO! (Space)', g.x, g.y, 17, '#062b10', 800);
+      }
+      if (state === 'work' || state === 'release') text(fmt(t - tStart + penalty), W - 22, 24, 20, INK, 800, 'right');
+      if (state === 'stopped') {
+        text(fmt(last), W / 2, H - 62, 34, last < 1800 ? '#BF5AF2' : (last < 2500 ? '#30D158' : '#FFD60A'), 800);
+        text(last < 1800 ? 'World-class stop!' : (last < 2500 ? 'Solid stop' : 'Slow stop, the crew is sad'), W / 2, H - 30, 14, MUTED, 500);
+      }
+      if (two && state !== 'done') text(P[order[Math.min(k, order.length - 1)]].name, 22, 24, 14, P[order[Math.min(k, order.length - 1)]].color, 700, 'left');
+      else text('Stop ' + Math.min(k + 1, order.length) + ' / ' + order.length, 22, 24, 13, FAINT, 600, 'left');
+    },
+  };
+}
+
+// ================================================================== GRID DASH
+function makeDash(a) {
+  const P = a.players, two = P.length === 2, R = rng(a.seed), race = a.race;
+  const BASE = 520, DIST = BASE * 38, GAP = 95, CAR_W = 26, CAR_H = 50;
+  const field = race.field.filter(c => c.start !== race.start);      // everyone except the driver you replace
+  const rivals = field.map(c => {
+    const skill = 1 - (c.start - 1) / Math.max(1, field.length);      // front of the grid = faster
+    return { name: c.short, color: c.color, y0: (race.start - c.start) * GAP,
+             v: BASE * (0.79 + 0.13 * skill + 0.04 * R()), lane: Math.floor(R() * 4), x: 0,
+             swaps: Array.from({ length: 6 }, () => [R() * 40, Math.floor(R() * 4)]).sort((p, q) => p[0] - q[0]) };
+  });
+  const boosts = Array.from({ length: 14 }, (_, i) => ({ y: 1800 + i * (DIST - 2600) / 14 + R() * 400, lane: Math.floor(R() * 4) }));
+  let t0 = 0, state = 'idle', countdownAt = 0;
+  const views = P.map((p, i) => ({ p, i, x: 0.5, y: 0, v: 0, crash: 0, safe: 0, boost: 0, done: null, crashes: 0, used: new Set() }));
+
+  function laneX(l) { return 0.14 + l * 0.24; }                        // lane centres, as share of road width
+  function rivalAt(r, s) {           // rivals glide between lanes on a fixed, seeded schedule
+    let cur = r.lane, x = laneX(cur);
+    for (const [ts, l] of r.swaps) {
+      if (s <= ts) break;
+      const p = Math.min(1, (s - ts) / 0.9);
+      x = laneX(cur) + (laneX(l) - laneX(cur)) * p;
+      cur = l;
+    }
+    return { y: r.y0 + r.v * s, x: x };
+  }
+  function position(view, s) { let ahead = 0; rivals.forEach(r => { if (rivalAt(r, s).y > view.y) ahead++; }); return ahead + 1; }
+  function go() { state = 'countdown'; countdownAt = performance.now(); }
+  function end() {
+    state = 'done';
+    const results = views.map(v => ({ name: v.p.name, start: race.start, finish_pos: v.done.pos, time_ms: Math.round(v.done.time * 1000), crashes: v.crashes }));
+    let html = '<h2>🏁 Chequered flag!</h2><table>';
+    results.forEach(r => { html += '<tr><td>' + r.name + '</td><td>P' + r.start + ' → <b>P' + r.finish_pos + '</b></td><td>' + r.crashes + ' crashes</td></tr>'; });
+    overlay(html + '</table>');
+    finish(results);
+  }
+  function control(view) {
+    let left = false, right = false;
+    if (two) { left = keysDown.has(view.i === 0 ? 'a' : 'arrowleft'); right = keysDown.has(view.i === 0 ? 'd' : 'arrowright'); }
+    else {
+      left = keysDown.has('a') || keysDown.has('arrowleft'); right = keysDown.has('d') || keysDown.has('arrowright');
+      touches.forEach(x => { if (x < W / 2) left = true; else right = true; });
+    }
+    return (right ? 1 : 0) - (left ? 1 : 0);
+  }
+  let lastT = 0;
+  return {
+    get state() { return state; },
+    get views() { return views; },
+    height: 520,
+    init() {
+      const how = two ? P[0].name + ': <span class="k">A</span><span class="k">D</span> · ' + P[1].name + ': <span class="k">←</span><span class="k">→</span>'
+                      : 'Steer with <span class="k">←</span><span class="k">→</span> or <span class="k">A</span><span class="k">D</span>, or hold the left or right side of the screen';
+      overlay('<p>' + race.title + '</p><h2>🏎️ Grid Dash</h2><p>You take <b>' + race.driver + "'s</b> seat, starting <b>P" + race.start +
+              '</b>. Overtake to gain places, grab the blue <b>DRS</b> chevrons, and do not hit anyone.</p><p>' + how + '</p>',
+              ARGS.start_at ? null : 'Start', go);
+      if (ARGS.start_at) startWhenScheduled(go);
+    },
+    frame(t) {
+      const dt = Math.min(0.05, (t - (lastT || t)) / 1000); lastT = t;
+      let s = 0;
+      if (state === 'countdown') { if (t - countdownAt > 3200) { state = 'race'; t0 = t; } }
+      if (state === 'race' || state === 'done') s = (t - t0) / 1000;
+      ctx.fillStyle = '#0E0E12'; ctx.fillRect(0, 0, W, H);
+      const vw = two ? W / 2 : W;
+      views.forEach((view, vi) => {
+        const rw = Math.min(vw * 0.82, 470), cs = Math.max(1.05, Math.min(1.6, rw / 290));   // road width, car scale
+        if (state === 'race' && !view.done) {
+          const steer = control(view);
+          const top = BASE * (view.boost > 0 ? 1.3 : 1);
+          if (view.crash > 0) { view.crash -= dt; view.v = Math.min(view.v, BASE * 0.3); }
+          else view.v += (top - view.v) * Math.min(1, dt * 1.6);
+          view.boost = Math.max(0, view.boost - dt); view.safe = Math.max(0, view.safe - dt);
+          view.x = Math.max(0.06, Math.min(0.94, view.x + steer * dt * 0.9));
+          view.y += view.v * dt;
+          rivals.forEach(r => {
+            const q = rivalAt(r, s);
+            if (view.safe <= 0 && Math.abs(q.y - view.y) < CAR_H * cs * 0.85 / 0.9 && Math.abs(q.x - view.x) * rw < CAR_W * cs * 0.9) {
+              view.crash = 1.0; view.safe = 1.8; view.crashes++; view.v *= 0.3;
+            }
+          });
+          boosts.forEach((b, bi) => {
+            if (!view.used.has(bi) && Math.abs(b.y - view.y) < 34 * cs && Math.abs(laneX(b.lane) - view.x) * rw < 28 * cs) { view.used.add(bi); view.boost = 1.5; }
+          });
+          if (view.y >= DIST) { view.done = { pos: position(view, s), time: s }; if (views.every(v => v.done)) end(); }
+        }
+        // draw this viewport
+        const ox = vi * vw, rx = ox + (vw - rw) / 2, camY = H * 0.78;
+        const toScreen = wy => camY - (wy - view.y) * 0.9;
+        ctx.save(); ctx.beginPath(); ctx.rect(ox, 0, vw, H); ctx.clip();
+        ctx.fillStyle = '#16351c'; ctx.fillRect(ox, 0, vw, H);                                   // grass
+        ctx.fillStyle = '#26262c'; ctx.fillRect(rx, 0, rw, H);                                   // asphalt
+        const off = (view.y * 0.9) % 40;
+        for (let yy = -40; yy < H + 40; yy += 40) {                                               // kerbs
+          ctx.fillStyle = Math.floor((yy + view.y * 0.9) / 40) % 2 ? RED : INK;
+          ctx.fillRect(rx - 8, yy + off, 8, 20); ctx.fillRect(rx + rw, yy + off, 8, 20);
+          ctx.fillStyle = Math.floor((yy + view.y * 0.9) / 40) % 2 ? INK : RED;
+          ctx.fillRect(rx - 8, yy + off + 20, 8, 20); ctx.fillRect(rx + rw, yy + off + 20, 8, 20);
+        }
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.setLineDash([22, 26]); ctx.lineDashOffset = -view.y * 0.9; ctx.lineWidth = 2;
+        for (let l = 1; l < 4; l++) { const lx = rx + rw * (0.02 + l * 0.24); ctx.beginPath(); ctx.moveTo(lx, 0); ctx.lineTo(lx, H); ctx.stroke(); }
+        ctx.setLineDash([]);
+        const fy = toScreen(DIST);                                                               // finish line
+        if (fy > -20 && fy < H + 20) { for (let c = 0; c < 16; c++) for (let rw2 = 0; rw2 < 2; rw2++) { ctx.fillStyle = (c + rw2) % 2 ? '#111' : INK; ctx.fillRect(rx + c * rw / 16, fy + rw2 * 8, rw / 16, 8); } }
+        boosts.forEach((b, bi) => {
+          const by = toScreen(b.y); if (by < -30 || by > H + 30 || view.used.has(bi)) return;
+          const bx = rx + laneX(b.lane) * rw; ctx.strokeStyle = '#3DD6F5'; ctx.lineWidth = 4; ctx.shadowColor = '#3DD6F5'; ctx.shadowBlur = 12;
+          for (let c = 0; c < 2; c++) { ctx.beginPath(); ctx.moveTo(bx - 12, by + 8 - c * 12); ctx.lineTo(bx, by - 4 - c * 12); ctx.lineTo(bx + 12, by + 8 - c * 12); ctx.stroke(); }
+          ctx.shadowBlur = 0;
+        });
+        rivals.forEach(r => {
+          const q = rivalAt(r, s), sy = toScreen(q.y); if (sy < -60 || sy > H + 60) return;
+          const sx = rx + q.x * rw; drawCar(sx, sy, r.color, cs, true);
+          if (Math.abs(sy - camY) < 220) text(r.name, sx, sy - 32 * cs, 11, MUTED, 700);
+        });
+        const px = rx + view.x * rw, flick = view.safe > 0 && Math.floor(t / 90) % 2;
+        if (!flick) {
+          ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.beginPath(); ctx.ellipse(px, camY + 2, 22 * cs, 34 * cs, 0, 0, Math.PI * 2); ctx.fill();
+          if (view.boost > 0) { ctx.shadowColor = '#3DD6F5'; ctx.shadowBlur = 22; }
+          drawCar(px + (view.crash > 0 ? Math.sin(t / 30) * 4 : 0), camY, view.p.color, cs * 1.12, true); ctx.shadowBlur = 0;
+          text(two ? view.p.name : 'YOU', px, camY - 38 * cs, 11, INK, 800);
+        }
+        // HUD
+        const pos = state === 'race' || state === 'done' ? (view.done ? view.done.pos : position(view, s)) : race.start;
+        ctx.fillStyle = 'rgba(14,14,18,0.82)'; rr(ox + 12, 12, 150, 56, 12); ctx.fill();
+        text('P' + pos, ox + 24, 40, 30, pos <= 3 ? '#FFD60A' : INK, 800, 'left');
+        text(two ? view.p.name : 'started P' + race.start, ox + 150, 30, 11, MUTED, 600, 'right');
+        if (view.boost > 0) text('DRS', ox + 150, 50, 12, '#3DD6F5', 800, 'right');
+        const prog = Math.min(1, view.y / DIST);
+        ctx.fillStyle = 'rgba(255,255,255,0.12)'; rr(ox + vw - 24, 16, 8, H - 32, 4); ctx.fill();
+        ctx.fillStyle = view.p.color; rr(ox + vw - 24, 16 + (H - 32) * (1 - prog), 8, (H - 32) * prog, 4); ctx.fill();
+        if (view.done && state !== 'done') text('Finished P' + view.done.pos + '!', ox + vw / 2, H / 2, 26, INK, 800);
+        if (view.crash > 0) text('CRASH!', ox + vw / 2, camY - 70, 20, RED, 800);
+        ctx.restore();
+      });
+      if (two) { ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(W / 2 - 1, 0, 2, H); }
+      if (state === 'countdown') {                                                                  // start lights
+        const lit = Math.min(5, Math.floor((t - countdownAt) / 550) + 1), out = t - countdownAt > 3000;
+        for (let i = 0; i < 5; i++) {
+          ctx.beginPath(); ctx.arc(W / 2 - 80 + i * 40, H / 2 - 40, 14, 0, Math.PI * 2);
+          const on = !out && i < lit; ctx.fillStyle = on ? RED : '#1C1C22'; if (on) { ctx.shadowColor = RED; ctx.shadowBlur = 20; } ctx.fill(); ctx.shadowBlur = 0;
+        }
+        if (out) text('GO!', W / 2, H / 2 + 10, 40, '#30D158', 800);
+      }
+    },
+  };
+}
+
+// ------------------------------------------------------------------ boot
+function start(a) {
+  const make = { lights: makeLights, pit: makePit, dash: makeDash }[a.game];
+  GAME = make(a);
+  resize(GAME.height);
+  GAME.init();
+}
+function loop(t) { if (GAME) GAME.frame(t); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+
+window.addEventListener('message', e => {
+  const d = e.data;
+  if (!d || d.type !== 'streamlit:render') return;
+  const a = d.args;
+  if (ARGS && ARGS.nonce === a.nonce) return;          // same game, Streamlit is just redrawing the page
+  ARGS = a;
+  if (a.server_now) clockOffset = a.server_now - Date.now();
+  start(a);
+});
+Stl.ready();
+</script>
+</body>
+</html>
