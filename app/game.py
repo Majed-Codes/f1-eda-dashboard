@@ -105,12 +105,12 @@ def story(df, game, race, r):
 
 def mood_for(game, r):
     if game == 'lights':
-        return ('wow', 'Lightning launch! ⚡') if (r.get('best_ms') or 999) < 220 else \
-               (('happy', 'Nice start!') if r.get('best_ms') else ('oops', 'Jump start! Drive-through penalty!'))
+        return ('wow', 'Mega launch. Simply lovely ⚡') if (r.get('best_ms') or 999) < 220 else \
+               (('happy', 'Good start. We can work with that.') if r.get('best_ms') else ('oops', 'Jump start. That is a penalty, sorry.'))
     if game == 'pit':
-        return ('wow', 'Box box, perfect stop!') if r['best_ms'] < 1800 else ('happy', 'Good work, crew!')
+        return ('wow', 'Perfect stop. Great job, guys!') if r['best_ms'] < 1800 else ('happy', 'Decent stop. A bit more speed next time.')
     return ('wow', 'What a drive! 🏆') if r['finish_pos'] <= 3 else \
-           (('happy', 'Points finish!') if r['finish_pos'] <= 10 else ('oops', 'Tough race. Rematch?'))
+           (('happy', 'Points are points.') if r['finish_pos'] <= 10 else ('oops', 'Not our day. Again?'))
 
 
 def rank_key(game, r):

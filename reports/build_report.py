@@ -297,8 +297,8 @@ story += [p("5. Dashboard Overview", h1),
                     "<b>Play tab:</b> three F1 mini games built on real grids and results (Lights Out reaction starts, "
                     "Pit Stop, and Grid Dash, a top-down race from a real grid slot). They can be played solo, by two "
                     "players on one device, or as an online championship that friends join from their phones.",
-                    "<b>Chibi Max:</b> my own chibi drawing of Max Verstappen, animated, floating over the page as an assistant "
-                    "powered by Claude. He follows the mouse with his eyes, can be dragged anywhere, and a double-click "
+                    "<b>Max Verstappen assistant:</b> my own chibi drawing of Max Verstappen, animated, floating over the "
+                    "page as a fan-made AI character powered by Claude who talks like Max. He follows the mouse with his eyes, can be dragged anywhere, and a double-click "
                     "opens a chat window. He answers questions about the data by calling tools that query "
                     "clean_data.csv, so the numbers come from the data and not from memory.",
                     "<b>Data tab:</b> a preview of the filtered rows, summary statistics and a CSV download.",
@@ -370,7 +370,7 @@ story += [p("7. References", h1),
                     "Streamlit: https://streamlit.io",
                     "scikit-learn: https://scikit-learn.org",
                     "ReportLab (used to build this PDF): https://www.reportlab.com",
-                    "Anthropic Claude API (Chibi Max assistant): https://docs.anthropic.com"])]
+                    "Anthropic Claude API (Max Verstappen assistant): https://docs.anthropic.com"])]
 
 ReportDoc(str(OUT)).multiBuild(story)
 print("wrote", OUT)

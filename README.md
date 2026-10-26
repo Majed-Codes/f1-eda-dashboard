@@ -75,12 +75,13 @@ dashboard needs an internet connection to draw them (everything else works offli
 The dark/red theme is in `app/.streamlit/config.toml`. Streamlit reads the config from the folder
 you run the command in, so the same file is also at `.streamlit/config.toml` in the repo root.
 
-### Chibi Max (AI assistant)
+### Max Verstappen (AI assistant)
 
-Chibi Max is my own chibi drawing of Max Verstappen, and he floats in the corner of the dashboard as the assistant.
+The assistant is my own chibi drawing of Max Verstappen, and he floats in the corner of the dashboard.
 He bounces, blinks, follows your mouse with his eyes, and drops the straight face when the mouse gets close. Drag him
 anywhere (he remembers where you left him), and double-click him (double-tap on a phone) to open a chat window.
-He is a fan drawing, not the real driver, and the assistant is told never to speak for him.
+In the chat he talks like Max: calm, direct and a bit dry. He is a fan-made AI character, not the real Max, so he
+never makes up real quotes or private details, and he says so if someone sincerely asks.
 
 His answers come from Claude (`claude-opus-5-5`), and every number he gives comes from tools that query
 `clean_data.csv`, so he does not guess statistics. To turn him on, create `.streamlit/secrets.toml` in the repo root:
@@ -136,7 +137,7 @@ f1-eda-dashboard/
 │   ├── app.py               # the dashboard
 │   ├── charts.py            # animated ECharts charts
 │   ├── game.py              # Lights Out Arcade and online rooms
-│   ├── mascot.py            # Chibi Max, the AI assistant
+│   ├── mascot.py            # Max, the AI assistant
 │   ├── static/              # Max's drawing layers
 │   ├── arcade/index.html    # the canvas mini games
 │   ├── clean_data.csv

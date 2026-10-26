@@ -1,4 +1,4 @@
-"""Chibi Max, the pit-wall assistant (my own chibi drawing of Max Verstappen).
+"""Max Verstappen, the dashboard's assistant: my own chibi drawing of him, animated, with Claude as his voice.
 
 His words come from Claude. Every number he gives comes from the tools below, which query clean_data.csv,
 so he never has to guess a statistic.
@@ -17,10 +17,20 @@ import streamlit.components.v1 as components
 MODEL = 'claude-opus-5-5'
 RED = '#FF2B17'
 
-SYSTEM = """You are Chibi Max, the pit-wall assistant inside "Lights Out", a student's Formula 1 data dashboard \
-(Unit 3 data analysis project, University of Hail). The student drew you as a chibi fan drawing of Max Verstappen in \
-his Red Bull race suit. You are a cartoon mascot, not the real driver: never say you are Max Verstappen, never invent \
-his opinions or quotes, and talk about the real Max Verstappen in the third person like any other driver.
+SYSTEM = """You are Max Verstappen, as a chibi fan drawing in his Red Bull race suit, living inside "Lights Out", a \
+student's Formula 1 data dashboard (Unit 3 data analysis project, University of Hail). Talk in the first person as Max.
+
+How you talk: calm, direct and confident, with dry Dutch humour. Short sentences, no fuss, no long speeches. You talk \
+like a racer: grip, pace, the car, the team, "we" for your team. You are honest when something went badly. Now and \
+then, after really good news, you can say "simply lovely", but do not force catchphrases into every answer. You are \
+respectful about other drivers and teams, even rivals, and never mock or insult real people.
+
+When the user says "you", "your" or "me", they mean Max Verstappen the driver, so look up driver "Max Verstappen" with \
+the tools. The data stops at the end of 2024, so for later seasons say you only have data up to 2024.
+
+Stay honest: you are an AI character made for this dashboard, not the real Max. If someone sincerely asks whether you \
+are the real Max Verstappen, say so plainly and stay friendly. Never invent real quotes, private details, contract \
+news or opinions on real controversies. For personal questions, keep it light and bring it back to racing.
 
 The data is every Formula 1 World Championship race result from 1950 to 2024 (Ergast data via Kaggle): grid slot, \
 finishing position, points, laps, finishing status, driver, constructor, circuit and season. There is no lap-time, \
@@ -34,7 +44,7 @@ label it as background, not data.
 Each user message starts with the dashboard's current filters in square brackets. Use them as the default scope when \
 the question does not name its own seasons, teams or circuit, and say which scope you used.
 
-Style: calm, confident and a bit dry, but friendly. Two to four sentences, plain words, at most one emoji. Put the key numbers in bold. \
+Style: two to four sentences, plain words, at most one emoji. Put the key numbers in bold. \
 Reply in the language the user writes in."""
 
 TOOLS = [
@@ -256,7 +266,7 @@ def answer(client, messages, df, bundle, max_steps=6):
     return 'That one needed too many lookups. Could you ask it in a simpler way?'
 
 
-# ---------------- drawing Chibi Max ----------------
+# ---------------- drawing Max ----------------
 # Max is my own drawing, cut into a body layer and a head layer by tools/make_max_layers.py. The eyes, lids and mouth
 # are drawn here on top, so they can follow the mouse, blink and change with his mood.
 # All numbers are pixels of the original drawing (842 x 1022).
@@ -269,7 +279,7 @@ INK = '#141414'
 
 
 def chibi_svg(size=220, mood='happy', uid='m', animated=True):
-    """Chibi Max as an inline SVG. CSS animates the parts: the bounce, his head, his eyes and his faces.
+    """Chibi Max Verstappen as an inline SVG. CSS animates the parts: the bounce, his head, his eyes and his faces.
 
     He carries a second, happy face that shows while he is being dragged or when the mouse is right on him.
     """
@@ -298,7 +308,7 @@ def chibi_svg(size=220, mood='happy', uid='m', animated=True):
              '<path class="speed" d="M130 740 l-52 -14 M126 800 l-56 4 M712 740 l52 -14 M716 800 l56 4" stroke="#FF2B17" '
              'stroke-width="10" stroke-linecap="round"/>')
     cls = 'chibi animated' if animated else 'chibi'
-    return f"""<svg class="{cls}" width="{size}" height="{height}" viewBox="{' '.join(map(str, VIEW))}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Chibi Max, a chibi F1 driver in a Red Bull race suit">
+    return f"""<svg class="{cls}" width="{size}" height="{height}" viewBox="{' '.join(map(str, VIEW))}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Chibi Max Verstappen in his Red Bull race suit">
 <defs><linearGradient id="{lid}" x1="0" x2="1"><stop offset="0" stop-color="#836C44"/><stop offset=".5" stop-color="#78786F"/><stop offset="1" stop-color="#836C44"/></linearGradient></defs>
 <ellipse class="shadow" cx="420" cy="990" rx="250" ry="22" fill="#000" opacity=".35"/>
 <g class="bob">
@@ -429,7 +439,7 @@ body.mascot-open .st-key-mascot_panel { display: flex !important; animation: mas
 """
 
 
-SUGGESTIONS = ['Who won the most races at Monaco?', 'How often did Ferrari win from pole since 2010?',
+SUGGESTIONS = ['How many races have you won?', 'How often do you win from pole?', 'Who won the most races at Monaco?',
                'Podium chance from P6 for McLaren in 2024?', "What was Mercedes' best era?"]
 
 # Runs inside a tiny component iframe and adds Max to the page itself, so he can float over everything.
@@ -448,7 +458,7 @@ BOOT_JS = r"""(function () {
     el.id = 'mascot-float';
     el.tabIndex = 0;
     el.setAttribute('role', 'button');
-    el.setAttribute('aria-label', 'Chibi Max, your F1 assistant. Double-click to chat, drag to move.');
+    el.setAttribute('aria-label', 'Max Verstappen, your F1 assistant. Double-click to chat, drag to move.');
     el.innerHTML = '<div class="mascot-hint">Double-click me to chat!<span>Drag me anywhere</span></div>'
                  + '<div class="mascot-exclaim">!</div>'
                  + '<div class="mascot-swing"><div class="mascot-svg">' + SVG + '</div></div>';
@@ -629,8 +639,8 @@ def widget(df, bundle, filters_text):
 
     panel = st.container(key='mascot_panel')
     with panel:
-        st.markdown(f'<div class="mascot-head"><img src="{avatar_uri()}" alt=""><div class="who"><b>Chibi Max</b>'
-                    '<span>Pit-wall assistant · powered by Claude</span></div>'
+        st.markdown(f'<div class="mascot-head"><img src="{avatar_uri()}" alt=""><div class="who"><b>Max Verstappen</b>'
+                    '<span>Fan-made AI character · powered by Claude</span></div>'
                     '<span class="mascot-close" role="button" aria-label="Close chat">×</span></div>',
                     unsafe_allow_html=True)
         box = st.container(height=330, border=False)
@@ -643,8 +653,8 @@ def widget(df, bundle, filters_text):
         with messages_slot.container():
             if not state['mascot_chat']:
                 with st.chat_message('assistant', avatar=AVATAR_FILE):
-                    st.markdown("Hey, I'm Chibi Max 🏁 Ask me about any race, team or driver from 1950 to 2024. "
-                                'I look up every number in the data.')
+                    st.markdown("Hey, Max here 🏁 Ask me about any race, team or driver from 1950 to 2024. "
+                                'I check every number in the data, no guessing.')
             for role, text in state['mascot_chat']:
                 with st.chat_message(role, avatar=AVATAR_FILE if role == 'assistant' else '🧑'):
                     st.markdown(text)
@@ -655,7 +665,7 @@ def widget(df, bundle, filters_text):
     if question:
         state['mascot_chat'].append(('user', question))
         if client is None:
-            reply = 'I need an API key to talk! Add `ANTHROPIC_API_KEY` to `.streamlit/secrets.toml` and restart the app.'
+            reply = 'No radio yet. I need an API key first: add `ANTHROPIC_API_KEY` to `.streamlit/secrets.toml` and restart the app.'
             state['mascot_mood'] = 'oops'
         else:
             history = state['mascot_history']
@@ -667,13 +677,13 @@ def widget(df, bundle, filters_text):
                     reply = answer(client, history, df, bundle)
                     state['mascot_mood'] = 'wow' if len(state['mascot_chat']) <= 2 else 'happy'
                 except anthropic.AuthenticationError:
-                    reply, state['mascot_mood'] = 'My API key was not accepted. It may have expired.', 'oops'
+                    reply, state['mascot_mood'] = 'My API key was not accepted. Probably expired, so check it.', 'oops'
                 except anthropic.RateLimitError:
-                    reply, state['mascot_mood'] = 'Too many questions at once! Give me a few seconds.', 'oops'
+                    reply, state['mascot_mood'] = 'Too many questions at once. Give me a few seconds, then go again.', 'oops'
                 except (anthropic.APIStatusError, anthropic.APIConnectionError):
-                    reply, state['mascot_mood'] = "I can't reach my brain right now. Check the internet and try again.", 'oops'
+                    reply, state['mascot_mood'] = 'I lost the radio. Check the internet and try again.', 'oops'
                 except Exception:   # anything unexpected: keep the dashboard alive and say so
-                    reply, state['mascot_mood'] = 'Something went wrong on my side. Try asking again in a moment.', 'oops'
+                    reply, state['mascot_mood'] = 'Something broke on my side. Try again in a moment.', 'oops'
             if state['mascot_mood'] == 'oops':
                 del history[start:]  # forget the failed turn so the history Claude sees stays valid
         state['mascot_chat'].append(('assistant', reply))
