@@ -289,8 +289,9 @@ story += [p("5. Dashboard Overview", h1),
                     "<b>Dominance tab:</b> a bar chart race of constructor wins that plays season by season, the leading "
                     "team's share of wins in every season (in team colours), and a table of the top team in each era.",
                     "<b>Reliability tab:</b> DNF rate per season (all and mechanical) and what ended the race in each decade.",
-                    "<b>Drivers tab:</b> pick a driver to see starts, wins, podiums, pole starts, places gained and "
-                    "podiums per season.",
+                    "<b>Drivers tab:</b> pick a driver (or tap a quick pick) to see starts, wins, podiums, pole starts and "
+                    "places gained, rings for win, podium and finish rates, every race they started (grid against "
+                    "result), a radar against the field average, and their career season by season in team colours.",
                     "<b>Predict tab:</b> pick a grid slot, team and season and the logistic regression gives a podium "
                     "chance on an animated gauge, with the chance from every grid slot shown as a bar chart.",
                     "<b>Play tab:</b> three F1 mini games built on real grids and results (Lights Out reaction starts, "

@@ -57,6 +57,18 @@ Run all cells from top to bottom. The notebook reads `data/raw/` and writes `dat
 streamlit run app/app.py
 ```
 
+The dashboard has a filter bar at the top (seasons, constructors, circuit) and seven tabs:
+
+- **Qualifying**: win, podium and points rate by grid slot, a grid to result flow, and places gained on Sunday.
+- **Dominance**: a bar chart race of wins by team, the leading team's share of wins each season, and the top team
+  of each era.
+- **Reliability**: DNF rate over time and what ended the race in each decade.
+- **Drivers**: pick a driver to see their rates, every race they started (grid against result), how they compare
+  with the field, and their career season by season.
+- **Predict**: a logistic regression that gives the podium chance for a grid slot, team and season.
+- **Play**: the Lights Out Arcade (see below).
+- **Data**: the filtered rows and summary statistics.
+
 The charts are animated with [Apache ECharts](https://echarts.apache.org), loaded from the jsDelivr CDN, so the
 dashboard needs an internet connection to draw them (everything else works offline).
 
@@ -115,11 +127,16 @@ f1-eda-dashboard/
 ├── notebook/
 │   └── f1_eda.ipynb
 ├── app/
-│   ├── app.py
+│   ├── app.py               # the dashboard
+│   ├── charts.py            # animated ECharts charts
+│   ├── game.py              # Lights Out Arcade and online rooms
+│   ├── polly.py             # Polly, the AI assistant
+│   ├── arcade/index.html    # the canvas mini games
 │   ├── clean_data.csv
 │   └── .streamlit/config.toml
 ├── reports/
 │   ├── figures/
+│   ├── screenshots/
 │   ├── build_report.py
 │   └── F1_EDA_Report.pdf
 ├── presentation/

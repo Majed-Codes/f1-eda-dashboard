@@ -41,7 +41,7 @@ st.markdown(f"""
 .st-key-filterbar label p {{ color: {FAINT} !important; font-size: 12px !important; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }}
 .brand {{ color: {INK}; font-size: 22px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; padding-top: 16px; white-space: nowrap; }}
 .brand span {{ color: {RED}; }}
-.brand-sub {{ color: {FAINT}; font-size: 12px; margin-top: 2px; }}
+.brand-sub {{ color: {FAINT}; font-size: 12px; margin-top: 2px; white-space: nowrap; }}
 .st-key-filterbar [data-testid="stButton"] {{ padding-top: 26px; }}
 .st-key-filterbar [data-testid="stButton"] button p {{ white-space: nowrap; }}
 
