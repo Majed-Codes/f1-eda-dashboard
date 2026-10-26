@@ -226,9 +226,9 @@ def answer(client, messages, df, bundle, max_steps=6):
             system=SYSTEM,
             tools=TOOLS,
             messages=messages,
-            output_config={'effort': 'low'},
             betas=['server-side-fallback-2026-07-01'],
-            fallbacks='default',
+            # sent as raw body fields so older SDK versions (without these typed parameters) still work
+            extra_body={'output_config': {'effort': 'low'}, 'fallbacks': 'default'},
         )
         messages.append({'role': 'assistant', 'content': response.content})
 
@@ -687,6 +687,8 @@ def widget(df, bundle, filters_text):
                     reply, state['polly_mood'] = 'Too many questions at once! Give me a few seconds.', 'oops'
                 except (anthropic.APIStatusError, anthropic.APIConnectionError):
                     reply, state['polly_mood'] = "I can't reach my brain right now. Check the internet and try again.", 'oops'
+                except Exception:   # anything unexpected: keep the dashboard alive and say so
+                    reply, state['polly_mood'] = 'Something went wrong on my side. Try asking again in a moment.', 'oops'
             if state['polly_mood'] == 'oops':
                 del history[start:]  # forget the failed turn so the history Claude sees stays valid
         state['polly_chat'].append(('assistant', reply))

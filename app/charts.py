@@ -69,7 +69,7 @@ if (typeof echarts === 'undefined') {
     const e = entries[entries.length - 1];
     if (e.isIntersecting && !shown) { shown = true; animateIn(); }
     else if (!e.isIntersecting && e.boundingClientRect.width === 0) { shown = false; if (window.afterHide) window.afterHide(); }
-  }, { threshold: 0.2 }).observe(box);
+  }, { threshold: 0.01 }).observe(box);
 }
 </script></body></html>"""
 

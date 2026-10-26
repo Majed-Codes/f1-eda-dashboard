@@ -12,11 +12,15 @@ import time
 import uuid
 
 import numpy as np
-import segno
 import streamlit as st
 import streamlit.components.v1 as components
 
 from polly import chibi_svg
+
+try:
+    import segno   # QR codes for the online rooms; without it the room shows the code and link only
+except ImportError:
+    segno = None
 
 _arcade = components.declare_component('lights_out_arcade',
                                        path=os.path.join(os.path.dirname(__file__), 'arcade'))
@@ -418,7 +422,7 @@ def online_live(df):
                             unsafe_allow_html=True)
         with right:
             url = _join_url(code)
-            qr = segno.make(url, error='m').svg_inline(scale=5, dark='#111114', light='#FFFFFF', border=2)
+            qr = segno.make(url, error='m').svg_inline(scale=5, dark='#111114', light='#FFFFFF', border=2) if segno else ''
             st.markdown(f'<div class="gp-qr">{qr}<div class="gp-qr-code">{code}</div><div class="gp-qr-url">{url}</div>'
                         '</div>', unsafe_allow_html=True)
         st.button('Leave room', on_click=leave_room)
