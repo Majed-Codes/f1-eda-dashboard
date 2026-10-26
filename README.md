@@ -2,6 +2,8 @@
 
 Unit 3 Final Project by **Majed Alotaibi** (Tuwaiq Academy).
 
+**Live presentation:** https://majed-codes.github.io/f1-eda-dashboard/presentation/
+
 An exploratory data analysis of every Formula 1 World Championship race from 1950 to 2024.
 The main question is how much qualifying (grid position) decides the result on Sunday.
 The project has a cleaning and EDA notebook, an interactive Streamlit dashboard, a PDF report
