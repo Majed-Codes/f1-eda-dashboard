@@ -195,7 +195,7 @@ story += [p("2. Data Exploration", h1),
                     "Grid runs from 0 to 34. A grid of 0 means a pit-lane start or no grid slot.",
                     "Finishing order (<font face='Courier'>positionOrder</font>) goes up to 39 and laps up to 200 "
                     "(the Indianapolis 500 was part of the championship in the 1950s).",
-                    "There are 139 different status labels, from \"Finished\" and \"+1 Lap\" to \"Engine\", \"Magneto\" and \"Collision\"."]),
+                    "The status table has 139 labels (137 of them appear in the results), from \"Finished\" and \"+1 Lap\" to \"Engine\", \"Magneto\" and \"Collision\"."]),
           p("Missing values after reading \\N correctly", h2),
           table([["Column", "Missing", "Why it is missing"],
                  ["position", "10,953", "Driver was not classified (DNF, DNQ and so on)"],
