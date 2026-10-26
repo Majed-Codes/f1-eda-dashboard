@@ -22,9 +22,39 @@ FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', A
 
 st.markdown(f"""
 <style>
-[data-testid="stHeader"] {{ background: transparent; }}
-[data-testid="stDecoration"] {{ display: none; }}
-[data-testid="stMainBlockContainer"], .block-container {{ max-width: 1240px; padding-top: 3rem; padding-bottom: 5rem; }}
+[data-testid="stHeader"], [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"], [data-testid="stDecoration"] {{ display: none; }}
+[data-testid="stMainBlockContainer"], .block-container {{ max-width: 1240px; padding-top: 1rem; padding-bottom: 5rem; }}
+
+/* soft red glow behind the hero */
+[data-testid="stMain"]::before {{ content: ''; position: absolute; top: -260px; left: 50%; transform: translateX(-50%);
+  width: 1100px; height: 700px; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(255,43,23,0.16), rgba(255,43,23,0.04) 55%, transparent); }}
+
+/* frosted filter bar pinned to the top */
+[data-testid="stLayoutWrapper"]:has(> .st-key-filterbar) {{ position: sticky; top: 12px; z-index: 999; }}
+.st-key-filterbar {{ padding: 12px 18px 6px; margin-bottom: 40px;
+  background: rgba(22,22,27,0.72); backdrop-filter: saturate(180%) blur(22px); -webkit-backdrop-filter: saturate(180%) blur(22px);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.35); }}
+.st-key-filterbar label p {{ color: {FAINT} !important; font-size: 12px !important; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }}
+.brand {{ color: {INK}; font-size: 22px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; padding-top: 16px; white-space: nowrap; }}
+.brand span {{ color: {RED}; }}
+.brand-sub {{ color: {FAINT}; font-size: 12px; margin-top: 2px; }}
+.st-key-filterbar [data-testid="stButton"] {{ padding-top: 26px; }}
+
+/* five start lights: on one by one, then all out */
+.lights {{ display: flex; gap: 12px; margin: 30px 0 26px 0; }}
+.light {{ width: 20px; height: 20px; border-radius: 50%; background: #1C1C22; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+  animation-name: lamp; animation-fill-mode: both; animation-timing-function: linear; }}
+.light:nth-child(1) {{ animation-delay: 0.3s; animation-duration: 3.2s; }}
+.light:nth-child(2) {{ animation-delay: 0.8s; animation-duration: 2.7s; }}
+.light:nth-child(3) {{ animation-delay: 1.3s; animation-duration: 2.2s; }}
+.light:nth-child(4) {{ animation-delay: 1.8s; animation-duration: 1.7s; }}
+.light:nth-child(5) {{ animation-delay: 2.3s; animation-duration: 1.2s; }}
+@keyframes lamp {{
+  0% {{ background: #1C1C22; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); }}
+  1%, 97% {{ background: {RED}; box-shadow: 0 0 22px rgba(255,43,23,0.75), inset 0 0 0 1px rgba(255,255,255,0.15); }}
+  100% {{ background: #1C1C22; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); }} }}
+@media (prefers-reduced-motion: reduce) {{ .light {{ animation: none; }} }}
 
 .eyebrow {{ color: {RED}; font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; }}
 .hero-title {{ color: {INK}; font-size: clamp(40px, 6vw, 72px); font-weight: 700; letter-spacing: -0.035em; line-height: 1.02; margin: 0 0 18px 0; }}
@@ -33,7 +63,10 @@ st.markdown(f"""
 .hero-meta {{ color: {FAINT}; font-size: 14px; margin: 14px 0 34px 0; }}
 
 .stat-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 44px; }}
-.stat {{ background: {SURFACE}; border: 1px solid rgba(255,255,255,0.07); border-radius: 20px; padding: 22px 24px 20px; }}
+.stat {{ background: linear-gradient(180deg, #17171C, {SURFACE}); border: 1px solid rgba(255,255,255,0.07); border-radius: 20px;
+  padding: 22px 24px 20px; transition: transform .25s ease, border-color .25s ease; }}
+.stat:hover {{ transform: translateY(-3px); border-color: rgba(255,255,255,0.16); }}
+.stat.glow {{ border-color: rgba(255,43,23,0.35); box-shadow: 0 0 0 1px rgba(255,43,23,0.08), 0 18px 50px -20px rgba(255,43,23,0.45); }}
 .stat-label {{ color: {MUTED}; font-size: 14px; font-weight: 500; margin-bottom: 10px; }}
 .stat-value {{ color: {INK}; font-size: 46px; font-weight: 600; letter-spacing: -0.03em; line-height: 1; }}
 .stat-value.accent {{ color: {RED}; }}
@@ -52,16 +85,27 @@ st.markdown(f"""
 
 @media (max-width: 640px) {{ .stat {{ padding: 16px 16px 14px; }} .stat-value {{ font-size: 34px; }} .big-prob {{ font-size: 64px; }} }}
 
-[data-baseweb="tab-list"] {{ gap: 6px; border-bottom: 1px solid rgba(255,255,255,0.08); }}
-button[data-baseweb="tab"] {{ padding: 10px 14px; }}
-button[data-baseweb="tab"] p {{ font-size: 15px; font-weight: 500; }}
-[data-baseweb="tab-border"] {{ display: none; }}
-[data-baseweb="tab-panel"] {{ padding-top: 28px; }}
+/* pill tabs, like a segmented control */
+[data-baseweb="tab-list"] {{ gap: 4px; padding: 5px; width: fit-content; max-width: 100%; overflow-x: auto;
+  background: {SURFACE}; border: 1px solid rgba(255,255,255,0.07); border-radius: 999px; }}
+button[data-baseweb="tab"] {{ padding: 8px 18px; border-radius: 999px; height: auto; }}
+button[data-baseweb="tab"] p {{ font-size: 15px; font-weight: 500; color: {MUTED}; }}
+button[data-baseweb="tab"][aria-selected="true"] {{ background: #2A2A31; }}
+button[data-baseweb="tab"][aria-selected="true"] p {{ color: {INK}; }}
+[data-baseweb="tab-border"], [data-baseweb="tab-highlight"] {{ display: none; }}
+[data-baseweb="tab-panel"] {{ padding-top: 34px; }}
 
-[data-testid="stSidebar"] .brand {{ color: {INK}; font-size: 26px; font-weight: 700; letter-spacing: -0.03em; margin: 0; }}
-[data-testid="stSidebar"] .brand span {{ color: {RED}; }}
-[data-testid="stSidebar"] .side-label {{ color: {FAINT}; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin: 22px 0 6px 0; }}
-[data-testid="stSidebar"] .side-text {{ color: {MUTED}; font-size: 14px; line-height: 1.5; }}
+.footer {{ border-top: 1px solid rgba(255,255,255,0.08); margin-top: 56px; padding-top: 22px; color: {FAINT}; font-size: 13px; line-height: 1.6; }}
+.footer b {{ color: {MUTED}; font-weight: 600; }}
+
+@media (max-width: 640px) {{
+  [data-testid="stLayoutWrapper"]:has(> .st-key-filterbar) {{ position: static; }}
+  .st-key-filterbar {{ padding: 14px 16px 10px; margin-bottom: 24px; }}
+  .st-key-filterbar [data-testid="stHorizontalBlock"] {{ gap: 0.4rem; }}
+  .st-key-filterbar [data-testid="stButton"] {{ padding-top: 4px; }}
+  .brand {{ padding-top: 0; }}
+  .brand-sub {{ margin-bottom: 12px; }}
+  .lights {{ margin-top: 10px; }} }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -83,7 +127,8 @@ def pct(x):
 
 def stat_card(label, value, note='', accent=False):
     value_class = 'stat-value accent' if accent else 'stat-value'
-    return (f'<div class="stat"><div class="stat-label">{label}</div>'
+    card_class = 'stat glow' if accent else 'stat'
+    return (f'<div class="{card_class}"><div class="stat-label">{label}</div>'
             f'<div class="{value_class}">{value}</div><div class="stat-note">{note}</div></div>')
 
 
@@ -118,7 +163,7 @@ def show(fig):
     st.plotly_chart(fig, theme=None, config={'displayModeBar': False})
 
 
-# ---------------- sidebar ----------------
+# ---------------- filter bar ----------------
 DEFAULTS = {'years': (2010, 2024), 'teams': [], 'circuit': 'All circuits'}
 for key in DEFAULTS:
     if key not in st.session_state:
@@ -130,24 +175,18 @@ def reset_filters():
         st.session_state[key] = DEFAULTS[key]
 
 
-with st.sidebar:
-    st.markdown('<div class="brand">Lights <span>Out</span></div>', unsafe_allow_html=True)
-    st.markdown('<div class="side-label">About the data</div>'
-                '<div class="side-text">Every Formula 1 World Championship result from 1950 to 2024: '
-                'one row per driver per race, 26,759 rows. Source: '
-                '<a href="https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020">Kaggle, '
-                'Rohan Rao</a>, built from the Ergast API.</div>', unsafe_allow_html=True)
+team_options = df.groupby('team')['win'].sum().sort_values(ascending=False).index.tolist()
+circuit_options = ['All circuits'] + sorted(df['circuit_name'].unique())
 
-    st.markdown('<div class="side-label">Filters</div>', unsafe_allow_html=True)
-    st.slider('Seasons', 1950, 2024, key='years')
-
-    team_options = df.groupby('team')['win'].sum().sort_values(ascending=False).index.tolist()
-    st.multiselect('Constructors', team_options, key='teams', placeholder='All constructors')
-
-    circuit_options = ['All circuits'] + sorted(df['circuit_name'].unique())
-    st.selectbox('Circuit', circuit_options, key='circuit')
-
-    st.button('Reset filters', on_click=reset_filters, width='stretch')
+with st.container(key='filterbar'):
+    c_brand, c_years, c_teams, c_circuit, c_reset = st.columns([1.15, 2, 2.2, 1.9, 0.8], gap='medium',
+                                                               vertical_alignment='top')
+    c_brand.markdown('<div class="brand">Lights <span>Out</span></div><div class="brand-sub">F1 · 1950–2024</div>',
+                     unsafe_allow_html=True)
+    c_years.slider('Seasons', 1950, 2024, key='years')
+    c_teams.multiselect('Constructors', team_options, key='teams', placeholder='All constructors')
+    c_circuit.selectbox('Circuit', circuit_options, key='circuit')
+    c_reset.button('Reset', on_click=reset_filters, width='stretch')
 
 years = st.session_state['years']
 teams = st.session_state['teams']
@@ -158,10 +197,6 @@ if len(teams) > 0:
     f = f[f['team'].isin(teams)]
 if circuit != 'All circuits':
     f = f[f['circuit_name'] == circuit]
-
-with st.sidebar:
-    st.markdown(f'<div class="side-label">Selection</div><div class="side-text">{f["raceId"].nunique():,} races · '
-                f'{len(f):,} entries</div>', unsafe_allow_html=True)
 
 if len(f) == 0:
     st.markdown('<div class="hero-title">No races match.</div>'
@@ -217,6 +252,8 @@ if circuit != 'All circuits':
     scope.append(circuit)
 scope_text = ' · '.join([span] + scope)
 
+# kept in its own element so the start lights only play when the page first loads
+st.markdown('<div class="lights">' + '<div class="light"></div>' * 5 + '</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="eyebrow">Formula 1 · {scope_text}</div>'
             '<div class="hero-title">Is the race decided<br>on Saturday?</div>'
             f'<div class="hero-answer">{answer}</div>', unsafe_allow_html=True)
@@ -510,3 +547,10 @@ with tab_data:
 
     st.download_button('Download these rows as CSV', f.to_csv(index=False).encode('utf-8'),
                        file_name='f1_filtered.csv', mime='text/csv')
+
+# ---------------- footer ----------------
+st.markdown('<div class="footer"><b>About the data.</b> Every Formula 1 World Championship result from 1950 to 2024: '
+            'one row per driver per race, 26,759 rows from five joined tables. Source: '
+            '<a href="https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020">Formula 1 World '
+            'Championship (1950–2020), Rohan Rao on Kaggle</a>, built from the Ergast API. '
+            'Unit 3 Final Project · Majed Alotaibi · University of Hail.</div>', unsafe_allow_html=True)

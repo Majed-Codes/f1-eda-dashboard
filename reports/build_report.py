@@ -277,8 +277,9 @@ story += [p("4. Exploratory Data Analysis", h1),
 story += [p("5. Dashboard Overview", h1),
           p("The Streamlit dashboard (<font face='Courier'>app/app.py</font>) loads clean_data.csv and lets the user "
             "explore the same questions. Run it with <font face='Courier'>streamlit run app/app.py</font>."),
-          *bullets(["<b>Sidebar:</b> a short description of the dataset, a season range slider (default 2010-2024), a "
-                    "constructor multiselect, a circuit dropdown and a reset button.",
+          *bullets(["<b>Filter bar:</b> pinned to the top of the page instead of a sidebar, so the charts get the full "
+                    "width. It has a season range slider (default 2010-2024), a constructor multiselect, a circuit "
+                    "dropdown and a reset button. The dataset description is at the bottom of the page.",
                     "<b>Headline:</b> the main question with a short answer that changes with the filters, and four stat "
                     "tiles: wins from pole, wins from the front row, finishers within 3 places of their grid slot, and DNF "
                     "rate. Each tile shows how far the selection is from the 1950-2024 value.",
@@ -294,7 +295,7 @@ story += [p("5. Dashboard Overview", h1),
                     "<b>Data tab:</b> a preview of the filtered rows, summary statistics and a CSV download.",
                     "Every chart has hover details, and each tab ends with a short insight written from the filtered data."]),
           Spacer(1, 6),
-          screenshot(1, "Figure 11. Sidebar filters, the headline answer and the four stat tiles."),
+          screenshot(1, "Figure 11. The filter bar, the headline answer and the four stat tiles."),
           screenshot(2, "Figure 12. Qualifying tab: rate by grid slot, grid vs result heatmap and places gained."),
           screenshot(3, "Figure 13. Predict tab: podium chance for a chosen grid slot, team and season."),
           PageBreak()]
