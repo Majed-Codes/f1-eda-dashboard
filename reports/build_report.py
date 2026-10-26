@@ -316,8 +316,8 @@ story += [p("6. Insights and Conclusion", h1), p("Main insights", h2),
                 [6.6 * cm, 10 * cm]),
           p("Podium model", h2),
           p("A logistic regression predicts a podium from grid slot, team (top 6 plus Other) and year, trained on "
-            "2010-2024 starters with a stratified 75/25 split. It reaches precision 0.67, recall 0.57, F1 0.61 and "
-            "ROC-AUC 0.91. A dummy model that always says \"no podium\" gets 0 for precision, recall and F1, and 0.50 "
+            "2010-2024 starters with a stratified 80/20 split. It reaches precision 0.71, recall 0.53, F1 0.61 and "
+            "ROC-AUC 0.92. A dummy model that always says \"no podium\" gets 0 for precision, recall and F1, and 0.50 "
             "ROC-AUC. Grid slot does most of the work."),
           p("Conclusion", h2),
           p("The race is not fully decided on Saturday, but most of it is. Grid position and the car explain most of "

@@ -8,10 +8,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 RED = "#FF2B17"
 GREY = "#5C5C66"
@@ -33,18 +30,16 @@ def load_data():
 
 @st.cache_resource
 def train_podium_model(df):
-    """Same logistic regression as the notebook: podium ~ grid + team + year, 2010-2024."""
+    """Same logistic regression as the notebook: podium from grid, team and year, 2010-2024."""
     data = df[df["year"].between(2010, 2024) & df["starter"] & df["grid_clean"].notna()].copy()
-    top_teams = data.groupby("team")["points"].sum().nlargest(6).index.tolist()
-    data["team_group"] = data["team"].where(data["team"].isin(top_teams), "Other")
+    top_teams = data.groupby("team")["points"].sum().sort_values(ascending=False).head(6).index.tolist()
+    data["team_group"] = data["team"]
+    data.loc[~data["team"].isin(top_teams), "team_group"] = "Other"
 
-    prep = ColumnTransformer([
-        ("num", StandardScaler(), ["grid_clean", "year"]),
-        ("team", OneHotEncoder(handle_unknown="ignore"), ["team_group"]),
-    ])
-    model = Pipeline([("prep", prep), ("clf", LogisticRegression(max_iter=1000))])
-    model.fit(data[["grid_clean", "team_group", "year"]], data["podium"])
-    return model, top_teams
+    X = pd.get_dummies(data[["grid_clean", "team_group", "year"]])
+    model = LogisticRegression(max_iter=1000)
+    model.fit(X, data["podium"])
+    return model, top_teams, X.columns
 
 
 def style(fig, height=380):
@@ -189,12 +184,14 @@ st.markdown(
 
 # ------------------------------------------------------------------ model widget
 st.subheader("Predict podium chance")
-model, top_teams = train_podium_model(df)
+model, top_teams, model_cols = train_podium_model(df)
 m1, m2, m3, m4 = st.columns([1, 1, 1, 1])
 grid_in = m1.slider("Grid slot", 1, 20, 3)
 team_in = m2.selectbox("Team", top_teams + ["Other"])
 year_in = m3.slider("Season", 2010, 2024, 2024)
-prob = model.predict_proba(pd.DataFrame({"grid_clean": [grid_in], "team_group": [team_in], "year": [year_in]}))[0, 1]
+new_row = pd.get_dummies(pd.DataFrame({"grid_clean": [grid_in], "team_group": [team_in], "year": [year_in]}))
+new_row = new_row.reindex(columns=model_cols, fill_value=0)
+prob = model.predict_proba(new_row)[0, 1]
 m4.metric("Podium chance", f"{prob:.0%}")
 st.caption("Logistic regression trained on 2010–2024 starters (grid, team, year). "
            "It is a simple model, so treat the number as a rough guide.")
