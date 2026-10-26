@@ -92,6 +92,12 @@ st.markdown(f"""
 .insight {{ border-left: 2px solid {RED}; padding: 4px 0 4px 16px; margin: 8px 0 22px 0; color: {MUTED}; font-size: 15px; line-height: 1.55; }}
 .insight b {{ color: {INK}; }}
 
+.driver-name {{ font-size: clamp(34px, 4.5vw, 52px); background: linear-gradient(90deg, {INK} 55%, var(--c));
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: name-in .8s cubic-bezier(.2, .8, .2, 1) backwards; }}
+@keyframes name-in {{ from {{ opacity: 0; transform: translateX(-16px); letter-spacing: 0.02em; }} }}
+.team-chip {{ display: inline-flex; align-items: center; gap: 6px; margin: 0 6px 0 0; padding: 3px 10px; border-radius: 999px;
+  background: #16161B; border: 1px solid rgba(255,255,255,0.08); color: {MUTED}; font-size: 13px; }}
+.team-chip i {{ width: 9px; height: 9px; border-radius: 50%; }}
 .big-prob {{ color: {INK}; font-size: 88px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }}
 .big-prob span {{ color: {RED}; }}
 
@@ -402,20 +408,40 @@ with tab_r:
             f'but far fewer cars retire at all. Status labels changed over the decades, so treat the split as approximate.')
 
 # ---------------- drivers ----------------
+def _quick_pick():
+    if st.session_state.get('driver_pick'):
+        st.session_state['driver'] = st.session_state['driver_pick']
+    st.session_state['driver_pick'] = None
+
+
+def driver_metrics(rows):
+    """Percentages used by the radar, for one driver or for the whole field."""
+    s = rows[rows['starter']]
+    fin = s[s['finished'] & s['grid_clean'].notna()]
+    return [s['win'].mean() * 100, s['podium'].mean() * 100, (s['points'] > 0).mean() * 100,
+            (s['grid_clean'] <= 2).mean() * 100, s['finished'].mean() * 100,
+            (fin['positionOrder'] < fin['grid_clean']).mean() * 100 if len(fin) else 0]
+
+
 with tab_driver:
     driver_options = f[f['starter']].groupby('driver')['win'].sum().sort_values(ascending=False).index.tolist()
     if len(driver_options) == 0:
         section('Driver', 'No drivers in this selection.', 'Widen the filters.')
     else:
-        pick, _ = st.columns([1, 2])
+        pick, chips = st.columns([1, 2.2], gap='medium', vertical_alignment='bottom')
         driver = pick.selectbox('Driver', driver_options, key='driver', help='Sorted by wins in the current selection.')
+        chips.pills('Quick pick', driver_options[:6], key='driver_pick', on_change=_quick_pick,
+                    label_visibility='collapsed')
         d = f[f['driver'] == driver]
         d_start = d[d['starter']]
         d_fin = d[d['finished'] & d['grid_clean'].notna()]
         team_list = d['team'].value_counts().index.tolist()
-        section('Driver', driver,
-                f'{d["year"].min()}–{d["year"].max()} · ' + ', '.join(team_list[:3]) +
-                (f' and {len(team_list) - 3} more' if len(team_list) > 3 else ''))
+        color = game.TEAM_COLORS.get(team_list[0], RED) if team_list else RED
+        chips_html = ''.join(f'<span class="team-chip"><i style="background:{game.TEAM_COLORS.get(t, "#8E8E93")}"></i>'
+                             f'{t}</span>' for t in team_list[:4])
+        st.markdown(f'<div class="eyebrow">Driver</div><div class="section-title driver-name" style="--c:{color}">'
+                    f'{driver}</div><div class="lede">{d["year"].min()}–{d["year"].max()} · {len(d_start)} starts '
+                    f'&nbsp;{chips_html}</div>', unsafe_allow_html=True)
 
         gain = (d_fin['grid_clean'] - d_fin['positionOrder']).mean() if len(d_fin) else np.nan
         poles = d[d['grid_clean'] == 1]
@@ -427,13 +453,46 @@ with tab_driver:
             stat_card('Places gained', '–' if pd.isna(gain) else f'{gain:+.1f}', 'avg per classified finish'),
         ])
 
+        n = max(len(d_start), 1)
+        charts.rings([('Win rate', d_start['win'].sum() / n * 100, '#FFD60A'),
+                      ('Podium rate', d_start['podium'].sum() / n * 100, RED),
+                      ('Poles turned into wins', poles['win'].mean() * 100 if len(poles) else 0, color),
+                      ('Races finished', d_start['finished'].mean() * 100 if len(d_start) else 0, INK)])
+
+        col1, col2 = st.columns([1.5, 1], gap='large')
+        with col1:
+            pts = []
+            rng = np.random.default_rng(len(d_start))
+            for _, r in d_start[d_start['grid_clean'].notna()].iterrows():
+                kind = ('Win' if r['win'] else 'Podium' if r['podium'] else 'Points' if r['points'] > 0
+                        else 'No points' if r['finished'] else 'DNF')
+                y = r['positionOrder'] if r['finished'] else 24
+                pts.append({'x': round(float(r['grid_clean'] + rng.uniform(-0.25, 0.25)), 2),
+                            'y': round(float(y + rng.uniform(-0.25, 0.25)), 2), 'kind': kind,
+                            'race': f'{int(r["year"])} {r["race_name"]}'})
+            charts.race_scatter(pts)
+        with col2:
+            # each radar axis is scaled to the best driver in the selection with at least 20 starts
+            labels = ['Wins', 'Podiums', 'Points finishes', 'Front-row starts', 'Finished', 'Gained places']
+            field = driver_metrics(f)
+            regulars = f[f['starter']].groupby('driver').filter(lambda g: len(g) >= 20)
+            best = [max(v) for v in zip(*[driver_metrics(g) for _, g in regulars.groupby('driver')])] \
+                if len(regulars) else [100] * 6
+            mine = driver_metrics(d)
+            maxes = [max(5, round(max(b, m) * 1.05, 1)) for b, m in zip(best, mine)]
+            charts.radar(labels, maxes, mine, field, driver, color)
+
+        per_year = d.groupby('year').agg(wins=('win', 'sum'), podiums=('podium', 'sum'),
+                                         team=('team', lambda t: t.value_counts().index[0]))
+        charts.career(per_year.index.tolist(), per_year['wins'].tolist(),
+                      (per_year['podiums'] - per_year['wins']).tolist(), per_year['team'].tolist(),
+                      [game.TEAM_COLORS.get(t, '#8E8E93') for t in per_year['team']])
+
         if len(poles) > 0:
             insight(f'{driver} turned <b>{pct(poles["win"].mean())}</b> of pole starts into wins here. '
-                    f'Across all drivers in this selection the figure is {pct(starters[starters["grid_clean"] == 1]["win"].mean())}.')
-
-        per_year = d.groupby('year').agg(wins=('win', 'sum'), podiums=('podium', 'sum'))
-        charts.podiums_per_season(per_year.index.tolist(), per_year['wins'].tolist(),
-                                  (per_year['podiums'] - per_year['wins']).tolist())
+                    f'Across all drivers in this selection the figure is '
+                    f'{pct(starters[starters["grid_clean"] == 1]["win"].mean())}. Dots above the dashed line are races '
+                    f'where they finished higher than they started.')
 
 # ---------------- predict ----------------
 @st.cache_resource

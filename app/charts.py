@@ -4,6 +4,7 @@ Every chart animates in when it first appears and again whenever the filters cha
 cell for the exact numbers. ECharts is loaded from the jsDelivr CDN, pinned to one version.
 """
 import json
+import math
 
 import streamlit.components.v1 as components
 
@@ -342,4 +343,111 @@ def chance_curve(curve, selected, height=300, subtitle=''):
         'yAxis': y_axis(max=100, axisLabel={'formatter': '{value}%'}),
         'series': [{'type': 'bar', 'data': data, 'barCategoryGap': '28%', 'itemStyle': {'borderRadius': [6, 6, 0, 0]},
                     'animationDelay': STAGGER}],
+    }, height)
+
+
+# ================================================================ driver deep dive
+def rings(items, height=230):
+    """A row of progress rings, e.g. [('Win rate', 31.2, '#FF2B17'), ...]. Each sweeps round and counts up."""
+    n = len(items)
+    series = []
+    for i, (name, value, color) in enumerate(items):
+        cx = f'{(i + 0.5) / n * 100:.1f}%'
+        series.append({
+            'type': 'gauge', 'startAngle': 90, 'endAngle': -270, 'min': 0, 'max': 100, 'radius': '62%',
+            'center': [cx, '46%'], 'pointer': {'show': False},
+            'progress': {'show': True, 'overlap': False, 'roundCap': True, 'clip': False, 'width': 12,
+                         'itemStyle': {'color': color, 'shadowColor': color, 'shadowBlur': 12}},
+            'axisLine': {'lineStyle': {'width': 12, 'color': [[1, '#202026']]}},
+            'splitLine': {'show': False}, 'axisTick': {'show': False}, 'axisLabel': {'show': False},
+            'title': {'offsetCenter': [0, '128%'], 'color': MUTED, 'fontSize': 13, 'fontWeight': 600},
+            'detail': {'valueAnimation': True, 'offsetCenter': [0, 0], 'formatter': '{value}%', 'color': INK,
+                       'fontSize': 24, 'fontWeight': 800},
+            'data': [{'value': round(value), 'name': name}],
+            'animationDuration': 1600 + i * 250, 'animationEasing': 'cubicOut'})
+    render({'series': series}, height)
+
+
+def radar(labels, maxes, driver_vals, field_vals, driver_name, color, height=330):
+    labels_js = json.dumps(labels)
+    render({
+        'title': title('Against the field'),
+        'legend': {'bottom': 0, 'textStyle': {'color': MUTED}, 'itemWidth': 12, 'itemHeight': 12, 'icon': 'roundRect'},
+        'tooltip': {'trigger': 'item', 'formatter': '__fn__function (p) { const L = ' + labels_js + '; return "<b>" + p.name + "</b><br/>" + p.value.map((v, i) => L[i] + ": " + v + "%").join("<br/>"); }'},
+        'radar': {'indicator': [{'name': l, 'max': m} for l, m in zip(labels, maxes)], 'radius': '58%', 'center': ['50%', '54%'],
+                  'splitNumber': 4, 'axisName': {'color': MUTED, 'fontSize': 12},
+                  'splitLine': {'lineStyle': {'color': 'rgba(255,255,255,0.08)'}},
+                  'splitArea': {'areaStyle': {'color': ['rgba(255,255,255,0.015)', 'rgba(255,255,255,0.035)']}},
+                  'axisLine': {'lineStyle': {'color': 'rgba(255,255,255,0.08)'}}},
+        'series': [{'type': 'radar', 'symbol': 'circle', 'symbolSize': 6, 'data': [
+            {'name': 'Field average', 'value': [round(v, 1) for v in field_vals],
+             'lineStyle': {'color': '#8E8E93', 'type': 'dashed', 'width': 1.5}, 'itemStyle': {'color': '#8E8E93'},
+             'areaStyle': {'color': 'rgba(142,142,147,0.10)'}},
+            {'name': driver_name, 'value': [round(v, 1) for v in driver_vals],
+             'lineStyle': {'color': color, 'width': 2.5}, 'itemStyle': {'color': color},
+             'areaStyle': {'color': color + '40'}}]}],
+        'animationDuration': 1800, 'animationEasing': 'elasticOut',
+    }, height)
+
+
+def race_scatter(points, height=420):
+    """Every start of one driver: grid slot (x) against result (y). points = [{'x','y','kind','race'}]."""
+    style = {'Win': ('#FFD60A', 13), 'Podium': (RED, 11), 'Points': ('#F5F5F7', 8), 'No points': ('#6E6E73', 8),
+             'DNF': ('#4A4A52', 8)}
+    top = math.ceil(max([p['x'] for p in points] + [20]))
+    series = []
+    for kind, (color, size) in style.items():
+        pts = [{'value': [p['x'], p['y']], 'race': p['race']} for p in points if p['kind'] == kind]
+        if not pts:
+            continue
+        series.append({'name': kind, 'type': 'scatter', 'data': pts, 'symbolSize': size,
+                       'itemStyle': {'color': color, 'opacity': 0.9, 'borderColor': '#0A0A0C', 'borderWidth': 1,
+                                     'shadowColor': color if kind in ('Win', 'Podium') else 'transparent',
+                                     'shadowBlur': 10 if kind == 'Win' else 0},
+                       'emphasis': {'scale': 1.6},
+                       'animationDelay': '__fn__function (i) { return 200 + i * 12; }',
+                       'animationDuration': 900, 'animationEasing': 'backOut'})
+    series.append({'type': 'line', 'data': [[1, 1], [top, top]], 'symbol': 'none', 'silent': True,
+                   'lineStyle': {'color': 'rgba(255,255,255,0.18)', 'type': 'dashed', 'width': 1.5},
+                   'z': 0, 'animationDuration': 1500,
+                   'markPoint': {'symbol': 'none', 'data': []},
+                   'endLabel': {'show': True, 'formatter': 'finished where they started', 'color': FAINT,
+                                'fontSize': 11, 'offset': [-180, -12]}})
+    render({
+        'title': title('Every race: grid slot vs result'),
+        'legend': {'top': 30, 'left': 0, 'textStyle': {'color': MUTED}, 'itemWidth': 10, 'itemHeight': 10},
+        'tooltip': {'trigger': 'item', 'formatter': '__fn__function (p) { if (!p.data.race) return ""; '
+                                                     'return "<b>" + p.data.race + "</b><br/>Grid P" + p.value[0] + " → " + '
+                                                     '(p.value[1] >= 24 ? "DNF" : "P" + p.value[1]); }'},
+        'grid': {'top': 72, 'right': 24},
+        'xAxis': {'type': 'value', 'min': 0, 'max': top + 1, 'name': 'Grid slot', 'nameLocation': 'middle', 'nameGap': 26,
+                  'nameTextStyle': {'color': MUTED}, 'axisLabel': {'color': MUTED, 'formatter': 'P{value}', 'showMaxLabel': False},
+                  'splitLine': {'lineStyle': {'color': 'rgba(255,255,255,0.05)'}}, 'axisLine': {'show': False},
+                  'axisTick': {'show': False}, 'interval': 5},
+        'yAxis': {'type': 'value', 'min': 0, 'max': 25, 'inverse': True, 'interval': 4,
+                  'axisLabel': {'color': MUTED, 'showMaxLabel': False, 'formatter': '__fn__function (v) { return v >= 24 ? "DNF" : (v === 0 ? "" : "P" + v); }'},
+                  'splitLine': {'lineStyle': {'color': 'rgba(255,255,255,0.05)'}}, 'axisLine': {'show': False},
+                  'axisTick': {'show': False}},
+        'series': series,
+    }, height)
+
+
+def career(years, wins_n, other, teams, colors, height=330):
+    """Podiums per season, each season in the colour of the team the driver raced for."""
+    win_data = [{'value': int(w), 'team': t, 'itemStyle': {'color': c}} for w, t, c in zip(wins_n, teams, colors)]
+    pod_data = [{'value': int(o), 'team': t, 'itemStyle': {'color': c + '66', 'borderRadius': [5, 5, 0, 0]}}
+                for o, t, c in zip(other, teams, colors)]
+    render({
+        'title': title('Career, season by season · coloured by team'),
+        'tooltip': {'trigger': 'axis', 'axisPointer': {'type': 'shadow'},
+                    'formatter': '__fn__function (ps) { const t = ps[0].data.team; let s = "<b>" + ps[0].name + "</b> · " + t; '
+                                 'ps.forEach(p => { s += "<br/>" + p.seriesName + ": " + p.value; }); return s; }'},
+        'legend': {'top': 4, 'right': 0, 'textStyle': {'color': MUTED}, 'itemWidth': 12, 'itemHeight': 12,
+                   'icon': 'roundRect', 'data': ['Wins', 'Other podiums']},
+        'xAxis': x_axis([str(y) for y in years]),
+        'yAxis': y_axis(minInterval=1),
+        'series': [{'name': 'Wins', 'type': 'bar', 'stack': 'p', 'data': win_data, 'barCategoryGap': '24%',
+                    'itemStyle': {'color': '#F5F5F7'}, 'animationDelay': STAGGER},
+                   {'name': 'Other podiums', 'type': 'bar', 'stack': 'p', 'data': pod_data,
+                    'itemStyle': {'color': '#8E8E93'}, 'animationDelay': '__fn__function (i) { return 300 + i * 45; }'}],
     }, height)
