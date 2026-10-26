@@ -2,6 +2,8 @@
 
 Unit 3 Final Project by **Majed Alotaibi** (Tuwaiq Academy).
 
+**Live dashboard:** https://f1-eda-dashboard-q4ra9nh4rp59mufhrbpm4r.streamlit.app
+
 **Live presentation:** https://majed-codes.github.io/f1-eda-dashboard/presentation/
 
 An exploratory data analysis of every Formula 1 World Championship race from 1950 to 2024.
