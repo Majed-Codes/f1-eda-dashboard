@@ -277,8 +277,8 @@ stat_row([
     stat_card('DNF rate among starters', pct(dnf_rate), versus(dnf_rate, 'dnf')),
 ])
 
-tab_q, tab_d, tab_r, tab_driver, tab_p, tab_play, tab_ask, tab_data = st.tabs(
-    ['Qualifying', 'Dominance', 'Reliability', 'Drivers', 'Predict', 'Play', 'Ask Polly', 'Data'])
+tab_q, tab_d, tab_r, tab_driver, tab_p, tab_play, tab_data = st.tabs(
+    ['Qualifying', 'Dominance', 'Reliability', 'Drivers', 'Predict', 'Play', 'Data'])
 
 # ---------------- qualifying ----------------
 with tab_q:
@@ -535,10 +535,6 @@ with tab_p:
 with tab_play:
     game.play(df, train_model())
 
-with tab_ask:
-    filters_text = (f'Dashboard filters: seasons {years[0]}-{years[1]}; constructors: '
-                    f'{", ".join(teams) if teams else "all"}; circuit: {circuit}')
-    polly.chat(df, train_model(), filters_text)
 
 # ---------------- data ----------------
 with tab_data:
@@ -569,4 +565,7 @@ st.markdown('<div class="footer"><b>About the data.</b> Every Formula 1 World Ch
             'Championship (1950–2020), Rohan Rao on Kaggle</a>, built from the Ergast API. '
             'Unit 3 Final Project · Majed Alotaibi · University of Hail.</div>', unsafe_allow_html=True)
 
-polly.peek()
+# ---------------- Polly ----------------
+filters_text = (f'Dashboard filters: seasons {years[0]}-{years[1]}; constructors: '
+                f'{", ".join(teams) if teams else "all"}; circuit: {circuit}')
+polly.widget(df, train_model(), filters_text)

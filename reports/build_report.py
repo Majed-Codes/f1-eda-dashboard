@@ -294,8 +294,9 @@ story += [p("5. Dashboard Overview", h1),
                     "chance, with the chance from every grid slot shown as a bar chart.",
                     "<b>Play tab:</b> a mini game called Podium or Not? It shows a real 2010-2024 start and the user "
                     "guesses if it ended on the podium, competing against the model over 10 rounds.",
-                    "<b>Ask Polly tab:</b> a chibi assistant powered by Claude. She answers questions about the data by "
-                    "calling tools that query clean_data.csv, so the numbers come from the data and not from memory.",
+                    "<b>Polly:</b> a chibi assistant powered by Claude who floats over the page. She can be dragged "
+                    "anywhere, and a double-click opens a chat window. She answers questions about the data by calling "
+                    "tools that query clean_data.csv, so the numbers come from the data and not from memory.",
                     "<b>Data tab:</b> a preview of the filtered rows, summary statistics and a CSV download.",
                     "Every chart has hover details, and each tab ends with a short insight written from the filtered data."]),
           Spacer(1, 6),
