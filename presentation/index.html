@@ -1,3 +1,7 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lights Out</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,22 +20,14 @@
 }
 html,body{height:100%}
 [hidden]{display:none!important}
-body{margin:0;background:var(--asphalt);color:var(--chalk);font-family:var(--f-body);overflow:hidden;
+body{margin:0;background:var(--asphalt);color:var(--chalk);font-family:var(--f-body);overflow:hidden;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;
   padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:0;box-sizing:border-box}
 #viewport{position:relative;width:100%;height:100%;display:grid;place-items:center}
 #stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:0 0;background:var(--asphalt);overflow:hidden}
 
 /* atmosphere, kept quiet so the numbers lead */
-#streaks{position:absolute;inset:0;width:1920px;height:1080px;opacity:.45}
-.vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%, transparent 45%, rgba(0,0,0,.75) 100%);z-index:40}
-.grain{position:absolute;inset:-50%;pointer-events:none;z-index:41;opacity:.05;
-  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-  animation:grain 1s steps(6) infinite}
-@keyframes grain{0%{transform:translate(0,0)}20%{transform:translate(-3%,2%)}40%{transform:translate(2%,-3%)}60%{transform:translate(-2%,-1%)}80%{transform:translate(3%,3%)}100%{transform:translate(0,0)}}
-.scan{position:absolute;inset:0;pointer-events:none;z-index:42;opacity:.03;background:repeating-linear-gradient(0deg, var(--chalk) 0 1px, transparent 1px 4px)}
-#sweep{position:absolute;top:-10%;left:0;width:1400px;height:120%;z-index:50;pointer-events:none;transform:translateX(-2000px) skewX(-14deg);
-  background:linear-gradient(90deg, transparent 0%, rgba(255,43,23,.0) 10%, rgba(255,43,23,.85) 55%, var(--chalk) 62%, var(--red) 66%, transparent 100%);filter:blur(6px)}
-
+#streaks{position:absolute;inset:0;width:1920px;height:1080px;opacity:.2}
+.vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%, transparent 45%, rgba(0,0,0,.45) 100%);z-index:40}
 /* HUD */
 .hud{position:absolute;left:0;right:0;z-index:30;display:flex;align-items:center;justify-content:space-between;padding:0 140px;font-family:var(--f-mono);font-size:22px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
 .hud.top{top:44px}
@@ -242,7 +238,7 @@ p{margin:0}
 #menuBtn{width:auto;font:inherit;font-size:20px;letter-spacing:.14em;text-transform:uppercase;color:var(--chalk);background:var(--panel);border:1px solid var(--line);padding:8px 16px;cursor:pointer}
 #menuBtn:hover{border-color:var(--red)}
 #menuBtn:focus-visible,.lapmenu button:focus-visible{outline:3px solid var(--s-yellow);outline-offset:3px}
-.lapmenu{position:absolute;inset:0;z-index:70;background:rgba(8,8,10,.94);backdrop-filter:blur(8px);padding:140px;display:flex;flex-direction:column;gap:30px}
+.lapmenu{position:absolute;inset:0;z-index:70;background:rgba(8,8,10,.97);padding:140px;display:flex;flex-direction:column;gap:30px}
 .lapmenu h3{font-size:72px}
 .lapgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
 .lapmenu button{font:inherit;text-align:left;background:var(--carbon);border:1px solid var(--line);color:var(--chalk);padding:24px 26px;cursor:pointer;display:flex;flex-direction:column;gap:10px}
@@ -253,7 +249,7 @@ p{margin:0}
 #tip{position:absolute;z-index:65;pointer-events:none;background:#050506;border:1px solid var(--line);border-left:4px solid var(--red);padding:12px 16px;font-family:var(--f-mono);font-size:20px;color:var(--chalk);white-space:nowrap;box-shadow:0 20px 50px rgba(0,0,0,.6)}
 [data-tip]{cursor:crosshair}
 
-@media (prefers-reduced-motion: reduce){.grain{animation:none}.pin::after{animation:none}}
+@media (prefers-reduced-motion: reduce){.pin::after{animation:none}}
 </style>
 
 <div id="viewport">
@@ -513,8 +509,7 @@ p{margin:0}
   <div class="lapmenu" id="lapmenu" hidden><h3>Lap chart</h3><div class="lapgrid" id="lapgrid"></div></div>
   <div id="tip" hidden></div>
   <div id="notes" hidden><span class="k">Speaker notes</span><span id="notesText"></span></div>
-  <div id="sweep" aria-hidden="true"></div>
-  <div class="vignette"></div><div class="grain"></div><div class="scan"></div>
+  <div class="vignette"></div>
 </div>
 </div>
 
@@ -632,7 +627,7 @@ function sparkLoop(){ spx.clearRect(0,0,1920,1080);
 
 /* ---------- ambient: speed streaks ---------- */
 const cv = document.getElementById('streaks'), ctx = cv.getContext('2d');
-const streaks = Array.from({length:46},()=>({x:Math.random()*1920,y:Math.random()*1080,l:120+Math.random()*520,v:6+Math.random()*22,a:.05+Math.random()*.22,r:Math.random()<.22}));
+const streaks = Array.from({length:24},()=>({x:Math.random()*1920,y:Math.random()*1080,l:120+Math.random()*520,v:6+Math.random()*22,a:.05+Math.random()*.22,r:Math.random()<.22}));
 let boost = 0;
 function drawStreaks(){
   ctx.clearRect(0,0,1920,1080);
@@ -680,7 +675,7 @@ let cur = 0, step = 0, busy = false, lightsTimer = [];
 function enter(el){
   if(!G || reduce) return;
   const items = Array.from(el.querySelectorAll('[data-in]')).filter(x => !x.closest('[data-step]') && (x.closest('.beat') ? el.classList.contains('beat') : true));
-  G.fromTo(items,{x:90,opacity:0,filter:'blur(14px)'},{x:0,opacity:1,duration:.9,ease:'expo.out',stagger:.09,clearProps:'filter,opacity,transform'});
+  G.fromTo(items,{y:28,opacity:0},{y:0,opacity:1,duration:.7,ease:'power3.out',stagger:.07,clearProps:'opacity,transform'});
   if(el.classList.contains('beat') || !el.classList.contains('has-beats')) runCounters(el.classList.contains('beat') ? el : el.querySelector('.bignum') || el);
   const id = el.id;
   if(id==='s1') startLights();
@@ -736,14 +731,14 @@ function showStep(el, n, animate, dir){
     const swap = ()=>{ b.forEach((x,i)=>x.classList.toggle('on', i===n)); el.querySelectorAll('.beatbar i').forEach((x,i)=>x.classList.toggle('on', i<=n)); if(animate) enter(b[n]); };
     if(animate && old && old!==b[n] && G && !reduce){
       busy = true; boost = 1.5;
-      G.to(old,{x:-100*(dir||1),opacity:0,duration:.3,ease:'power2.in',onComplete:()=>{ G.set(old,{clearProps:'x,opacity'}); swap(); busy = false; }});
+      G.to(old,{opacity:0,duration:.25,ease:'power1.in',onComplete:()=>{ G.set(old,{clearProps:'opacity'}); swap(); busy = false; }});
     } else swap();
   } else {
     el.querySelectorAll('[data-step]').forEach(x=>{
       const s = +x.dataset.step, show = s<=n;
       x.classList.toggle('shown', show);
       if(show && animate && s===n && G && !reduce){
-        G.fromTo(x,{y:50,opacity:0,filter:'blur(10px)'},{y:0,opacity:1,duration:.8,ease:'expo.out',clearProps:'filter,opacity,transform'});
+        G.fromTo(x,{y:28,opacity:0},{y:0,opacity:1,duration:.7,ease:'power3.out',clearProps:'opacity,transform'});
         runCounters(x);
         if(x.classList.contains('merge')) G.fromTo(x.querySelectorAll('.chip'),{x:-60,opacity:0},{x:0,opacity:1,duration:.6,ease:'back.out(1.6)',stagger:.08});
       }
@@ -771,11 +766,9 @@ function go(n, land){
   if(from.id==='s9'){ flagOn=false; }
   if(!G || reduce){ from.classList.remove('active'); to.classList.add('active'); cur=n; showStep(to, target, false); if(to.id==='s9'){ drawFlag(); } return; }
   busy = true; boost = 2.5;
-  const sw = document.getElementById('sweep');
-  G.fromTo(sw,{x: dir>0 ? -1600 : 2200, skewX:-14},{x: dir>0 ? 2200 : -1600, duration:.75, ease:'power2.in'});
-  G.to(from,{x:-140*dir,opacity:0,filter:'blur(10px)',duration:.4,ease:'power2.in',onComplete:()=>{
-    from.classList.remove('active'); G.set(from,{clearProps:'x,opacity,filter'});
-    to.classList.add('active'); cur = n;
+  G.to(from,{opacity:0,duration:.3,ease:'power1.in',onComplete:()=>{
+    from.classList.remove('active'); G.set(from,{clearProps:'opacity'});
+    to.classList.add('active'); cur = n; G.fromTo(to,{opacity:0},{opacity:1,duration:.35,ease:'power1.out',clearProps:'opacity'});
     showStep(to, target, false); enter(to);
     const b = beatsOf(to); if(b.length) enter(b[target]);
     if(to.id==='s9'){ flagOn=true; flagLoop(); }
