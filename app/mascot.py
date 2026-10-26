@@ -316,6 +316,7 @@ def avatar_uri():
 
 CHIBI_CSS = """
 /* Max's idle life: a bounce with a little squash, breathing, a slow head tilt and blinking */
+.chibi { overflow: visible; }      /* the bounce and head tilt go past the SVG frame, so don't cut them off */
 .chibi .face-drag { display: none; }
 .chibi.animated .bob { animation: mascot-bounce 2.4s ease-in-out infinite; transform-origin: 420px 985px; }
 .chibi.animated .body { animation: mascot-breathe 2.4s ease-in-out infinite; transform-origin: 420px 980px; }
@@ -349,16 +350,18 @@ CHIBI_CSS = """
 #mascot-float.notice .chibi .bob { animation: mascot-hop .45s ease-out; }
 @keyframes mascot-hop { 0% { transform: scale(1.06, .92); } 40% { transform: translateY(-60px) scale(.96, 1.05); } 100% { transform: translateY(0); } }
 
-/* mouse right on him: he can't keep the straight face, giggles, blushes, hearts float up */
+/* mouse right on him: he can't keep the straight face, giggles, blushes, chequered flags float up */
 #mascot-float.close:not(.dragging) .face-normal { display: none; }
 #mascot-float.close:not(.dragging) .face-drag { display: inline; }
 #mascot-float.close:not(.dragging) .face-drag .speed { display: none; }
 #mascot-float.close .chibi .blush { opacity: .9; }
 #mascot-float.close:not(.dragging) .chibi { animation: mascot-giggle .5s ease-in-out infinite; transform-origin: 50% 95%; }
 @keyframes mascot-giggle { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg) scale(1.02); } }
-#mascot-float .mascot-heart { position: absolute; width: 16px; height: 16px; pointer-events: none;
-  animation: mascot-heart 1.3s ease-out forwards; }
-@keyframes mascot-heart { 0% { opacity: 0; transform: translate(0, 0) scale(.4); } 15% { opacity: 1; transform: translate(0, -8px) scale(1); }
+#mascot-float .mascot-flag { position: absolute; width: 20px; height: 20px; pointer-events: none;
+  animation: mascot-flag 1.3s ease-out forwards; }
+#mascot-float .mascot-flag .cloth { animation: mascot-flag-wave .35s ease-in-out infinite alternate; transform-origin: 3px 6px; }
+@keyframes mascot-flag-wave { from { transform: skewY(-8deg); } to { transform: skewY(8deg) scaleX(.92); } }
+@keyframes mascot-flag { 0% { opacity: 0; transform: translate(0, 0) scale(.4); } 15% { opacity: 1; transform: translate(0, -8px) scale(1); }
   100% { opacity: 0; transform: translate(var(--drift, 0px), -70px) scale(.8) rotate(var(--spin, 0deg)); } }
 
 /* being carried: happy face, speed lines, wobbly head and a wiggling body */
@@ -489,21 +492,27 @@ BOOT_JS = r"""(function () {
     let angle = 0, spin = 0, target = 0, lastX = null, lastT = 0;
     // eyes and face follow the mouse; getting close makes him react.
     // Positions are in the drawing's pixels: the SVG window starts at (20, -10) and is 800 wide.
-    let mx = null, my = null, near = false, close = false, lastHeart = 0, noticeTimer = null;
+    let mx = null, my = null, near = false, close = false, lastFlag = 0, noticeTimer = null;
     const X0 = 20, Y0 = -10, VW = 800;
     const eyeAt = [[322, 484], [537, 482]], eyeNow = [[0, 0], [0, 0]], lookNow = [0, 0];
     doc.addEventListener('pointermove', e => { mx = e.clientX; my = e.clientY; }, { passive: true });
     doc.documentElement.addEventListener('mouseleave', () => { mx = null; });
-    function heart() {
-      const h = doc.createElement('div');
-      h.className = 'mascot-heart';
-      h.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16"><path d="M8 14 C2 9.5 1 6.5 3 4.2 C4.6 2.4 7 3 8 5 C9 3 11.4 2.4 13 4.2 C15 6.5 14 9.5 8 14Z" fill="' + (Math.random() < .5 ? '#FF2B17' : '#FF7A90') + '"/></svg>';
-      h.style.left = (30 + Math.random() * 55) + '%';
-      h.style.top = (8 + Math.random() * 18) + '%';
-      h.style.setProperty('--drift', (Math.random() * 40 - 20) + 'px');
-      h.style.setProperty('--spin', (Math.random() * 50 - 25) + 'deg');
-      h.addEventListener('animationend', () => h.remove());
-      el.appendChild(h);
+    // a little chequered flag on a pole that floats up and waves
+    let cloth = '';
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++)
+      cloth += '<rect x="' + (4 + c * 3.5) + '" y="' + (2 + r * 3.5) + '" width="3.5" height="3.5" fill="' + ((r + c) % 2 ? '#15151A' : '#FFFFFF') + '"/>';
+    const FLAG = '<svg viewBox="0 0 20 20" width="20" height="20"><line x1="3" y1="1.5" x2="3" y2="19" stroke="#D9D9DE" stroke-width="1.8" stroke-linecap="round"/>'
+               + '<g class="cloth">' + cloth + '<rect x="4" y="2" width="14" height="10.5" fill="none" stroke="#15151A" stroke-width=".8"/></g></svg>';
+    function flag() {
+      const f = doc.createElement('div');
+      f.className = 'mascot-flag';
+      f.innerHTML = FLAG;
+      f.style.left = (30 + Math.random() * 55) + '%';
+      f.style.top = (8 + Math.random() * 18) + '%';
+      f.style.setProperty('--drift', (Math.random() * 40 - 20) + 'px');
+      f.style.setProperty('--spin', (Math.random() * 50 - 25) + 'deg');
+      f.addEventListener('animationend', e => { if (e.target === f) f.remove(); });
+      el.appendChild(f);
     }
     function follow() {
       const svg = el.querySelector('.mascot-svg svg');
@@ -541,7 +550,7 @@ BOOT_JS = r"""(function () {
       near = nowNear; close = nowClose;
       el.classList.toggle('near', near);
       el.classList.toggle('close', close);
-      if (close && performance.now() - lastHeart > 420) { lastHeart = performance.now(); heart(); }
+      if (close && performance.now() - lastFlag > 420) { lastFlag = performance.now(); flag(); }
     }
 
     (function tick() {
