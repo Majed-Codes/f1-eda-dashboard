@@ -1,6 +1,6 @@
 # Is the Race Decided on Saturday? F1 EDA + Dashboard
 
-Unit 3 Final Project by **Majed Alotaibi** (AI undergraduate, University of Hail).
+Unit 3 Final Project by **Majed Alotaibi** (AI undergraduate, Tuwaiq Academy).
 
 An exploratory data analysis of every Formula 1 World Championship race from 1950 to 2024.
 The main question is how much qualifying (grid position) decides the result on Sunday.

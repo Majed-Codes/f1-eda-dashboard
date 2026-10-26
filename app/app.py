@@ -571,7 +571,7 @@ st.markdown('<div class="footer"><b>About the data.</b> Every Formula 1 World Ch
             'one row per driver per race, 26,759 rows from five joined tables. Source: '
             '<a href="https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020">Formula 1 World '
             'Championship (1950–2020), Rohan Rao on Kaggle</a>, built from the Ergast API. '
-            'Unit 3 Final Project · Majed Alotaibi · University of Hail.</div>', unsafe_allow_html=True)
+            'Unit 3 Final Project · Majed Alotaibi · Tuwaiq Academy.</div>', unsafe_allow_html=True)
 
 # ---------------- Max ----------------
 filters_text = (f'Dashboard filters: seasons {years[0]}-{years[1]}; constructors: '
