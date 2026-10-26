@@ -292,6 +292,10 @@ story += [p("5. Dashboard Overview", h1),
                     "podiums per season.",
                     "<b>Predict tab:</b> pick a grid slot, team and season and the logistic regression gives a podium "
                     "chance, with the chance from every grid slot shown as a bar chart.",
+                    "<b>Play tab:</b> a mini game called Podium or Not? It shows a real 2010-2024 start and the user "
+                    "guesses if it ended on the podium, competing against the model over 10 rounds.",
+                    "<b>Ask Polly tab:</b> a chibi assistant powered by Claude. She answers questions about the data by "
+                    "calling tools that query clean_data.csv, so the numbers come from the data and not from memory.",
                     "<b>Data tab:</b> a preview of the filtered rows, summary statistics and a CSV download.",
                     "Every chart has hover details, and each tab ends with a short insight written from the filtered data."]),
           Spacer(1, 6),
@@ -358,7 +362,8 @@ story += [p("7. References", h1),
                     "Plotly: https://plotly.com/python/",
                     "Streamlit: https://streamlit.io",
                     "scikit-learn: https://scikit-learn.org",
-                    "ReportLab (used to build this PDF): https://www.reportlab.com"])]
+                    "ReportLab (used to build this PDF): https://www.reportlab.com",
+                    "Anthropic Claude API (Ask Polly assistant): https://docs.anthropic.com"])]
 
 ReportDoc(str(OUT)).multiBuild(story)
 print("wrote", OUT)

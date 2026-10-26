@@ -6,3 +6,7 @@ __pycache__/
 .ipynb_checkpoints/
 .DS_Store
 .claude/
+
+# api keys stay local
+.streamlit/secrets.toml
+app/.streamlit/secrets.toml

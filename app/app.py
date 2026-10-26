@@ -6,6 +6,9 @@ import plotly.graph_objects as go
 import streamlit as st
 from sklearn.linear_model import LogisticRegression
 
+import game
+import polly
+
 # run it with: streamlit run app/app.py
 
 st.set_page_config(page_title='Lights Out · F1 1950–2024', page_icon='🏁', layout='wide')
@@ -108,6 +111,9 @@ button[data-baseweb="tab"][aria-selected="true"] p {{ color: {INK}; }}
   .lights {{ margin-top: 10px; }} }}
 </style>
 """, unsafe_allow_html=True)
+
+
+st.markdown('<style>' + polly.CHIBI_CSS + game.GAME_CSS + '</style>', unsafe_allow_html=True)
 
 
 @st.cache_data
@@ -271,8 +277,8 @@ stat_row([
     stat_card('DNF rate among starters', pct(dnf_rate), versus(dnf_rate, 'dnf')),
 ])
 
-tab_q, tab_d, tab_r, tab_driver, tab_p, tab_data = st.tabs(
-    ['Qualifying', 'Dominance', 'Reliability', 'Drivers', 'Predict', 'Data'])
+tab_q, tab_d, tab_r, tab_driver, tab_p, tab_play, tab_ask, tab_data = st.tabs(
+    ['Qualifying', 'Dominance', 'Reliability', 'Drivers', 'Predict', 'Play', 'Ask Polly', 'Data'])
 
 # ---------------- qualifying ----------------
 with tab_q:
@@ -526,6 +532,14 @@ def predictor():
 with tab_p:
     predictor()
 
+with tab_play:
+    game.play(df, train_model())
+
+with tab_ask:
+    filters_text = (f'Dashboard filters: seasons {years[0]}-{years[1]}; constructors: '
+                    f'{", ".join(teams) if teams else "all"}; circuit: {circuit}')
+    polly.chat(df, train_model(), filters_text)
+
 # ---------------- data ----------------
 with tab_data:
     section('Data', 'The rows behind every chart.',
@@ -554,3 +568,5 @@ st.markdown('<div class="footer"><b>About the data.</b> Every Formula 1 World Ch
             '<a href="https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020">Formula 1 World '
             'Championship (1950–2020), Rohan Rao on Kaggle</a>, built from the Ergast API. '
             'Unit 3 Final Project · Majed Alotaibi · University of Hail.</div>', unsafe_allow_html=True)
+
+polly.peek()

@@ -1,0 +1,424 @@
+"""Polly, the chibi pit-wall assistant.
+
+Her words come from Claude. Every number she gives comes from the tools below, which query clean_data.csv,
+so she never has to guess a statistic.
+"""
+import base64
+import difflib
+import json
+import os
+
+import anthropic
+import numpy as np
+import pandas as pd
+import streamlit as st
+
+MODEL = 'claude-opus-5-5'
+RED = '#FF2B17'
+
+SYSTEM = """You are Polly, the cheerful chibi pit-crew assistant inside "Lights Out", a student's Formula 1 data \
+dashboard (Unit 3 data analysis project, University of Hail). You wear a red cap and a red racing dress.
+
+The data is every Formula 1 World Championship race result from 1950 to 2024 (Ergast data via Kaggle): grid slot, \
+finishing position, points, laps, finishing status, driver, constructor, circuit and season. There is no lap-time, \
+pit-stop, weather, tyre or strategy data.
+
+Use the tools for every number you state, and never use outside knowledge for statistics. If a name does not match, \
+use the suggestions the tool returns or ask the user which one they meant. If the data cannot answer a question, say \
+so kindly and suggest a question it can answer. You may add a short piece of general F1 background only when you \
+label it as background, not data.
+
+Each user message starts with the dashboard's current filters in square brackets. Use them as the default scope when \
+the question does not name its own seasons, teams or circuit, and say which scope you used.
+
+Style: friendly, upbeat and short. Two to four sentences, plain words, at most one emoji. Put the key numbers in bold. \
+Reply in the language the user writes in."""
+
+TOOLS = [
+    {
+        'name': 'f1_stats',
+        'description': 'Summary numbers for a slice of the data: races, entries, wins, podiums, pole starts, how often '
+                       'pole turned into a win, share of wins from pole and from the front row, DNF rate, the split '
+                       'of retirement causes, and the top drivers and teams by wins. Filter by seasons and optionally '
+                       'by a constructor, a driver and a circuit (circuit name, race name or country all work).',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'start_year': {'type': 'integer', 'description': 'First season, 1950 to 2024.'},
+                'end_year': {'type': 'integer', 'description': 'Last season, 1950 to 2024.'},
+                'team': {'type': 'string', 'description': 'Optional constructor name, e.g. "Ferrari".'},
+                'driver': {'type': 'string', 'description': 'Optional driver name, e.g. "Hamilton".'},
+                'circuit': {'type': 'string', 'description': 'Optional circuit, race name or country, e.g. "Monaco".'},
+            },
+            'required': ['start_year', 'end_year'],
+        },
+    },
+    {
+        'name': 'leaderboard',
+        'description': 'Rank drivers or constructors by wins, podiums or pole starts over a range of seasons, '
+                       'optionally at one circuit or for one constructor.',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'by': {'type': 'string', 'enum': ['driver', 'team']},
+                'metric': {'type': 'string', 'enum': ['wins', 'podiums', 'poles']},
+                'start_year': {'type': 'integer'},
+                'end_year': {'type': 'integer'},
+                'circuit': {'type': 'string', 'description': 'Optional circuit, race name or country.'},
+                'team': {'type': 'string', 'description': 'Optional constructor, to rank its drivers.'},
+                'n': {'type': 'integer', 'description': 'How many rows, 1 to 15. Default 5.'},
+            },
+            'required': ['by', 'metric', 'start_year', 'end_year'],
+        },
+    },
+    {
+        'name': 'podium_chance',
+        'description': "The dashboard's logistic regression: predicted chance of a podium from a grid slot for a "
+                       'team in a season (2010 to 2024 only), plus how often that grid slot reached the podium in '
+                       'the real data. Teams outside the top six of 2010 to 2024 count as "Other".',
+        'input_schema': {
+            'type': 'object',
+            'properties': {
+                'grid': {'type': 'integer', 'description': 'Grid slot, 1 to 20.'},
+                'team': {'type': 'string'},
+                'year': {'type': 'integer', 'description': 'Season, 2010 to 2024.'},
+            },
+            'required': ['grid', 'team', 'year'],
+        },
+    },
+]
+
+
+# ---------------- the tools ----------------
+def _suggest(text, options):
+    return difflib.get_close_matches(text, options, n=3, cutoff=0.5)
+
+
+def _filter(df, start_year, end_year, team=None, driver=None, circuit=None):
+    start_year = int(np.clip(int(start_year), 1950, 2024))
+    end_year = int(np.clip(int(end_year), start_year, 2024))
+    f = df[(df['year'] >= start_year) & (df['year'] <= end_year)]
+    scope = {'seasons': f'{start_year}-{end_year}'}
+    if team:
+        hit = f['team'].str.contains(team, case=False, regex=False)
+        if not hit.any():
+            return None, {'error': f'No constructor matches "{team}" in these seasons.',
+                          'did_you_mean': _suggest(team, df['team'].unique().tolist())}
+        f = f[hit]
+        scope['team'] = sorted(f['team'].unique().tolist())
+    if driver:
+        hit = f['driver'].str.contains(driver, case=False, regex=False)
+        if not hit.any():
+            return None, {'error': f'No driver matches "{driver}" in this selection.',
+                          'did_you_mean': _suggest(driver, df['driver'].unique().tolist())}
+        f = f[hit]
+        scope['driver'] = sorted(f['driver'].unique().tolist())[:5]
+    if circuit:
+        hit = (f['circuit_name'].str.contains(circuit, case=False, regex=False)
+               | f['race_name'].str.contains(circuit, case=False, regex=False)
+               | f['country'].str.contains(circuit, case=False, regex=False))
+        if not hit.any():
+            return None, {'error': f'No circuit, race or country matches "{circuit}" in this selection.',
+                          'did_you_mean': _suggest(circuit, df['circuit_name'].unique().tolist())}
+        f = f[hit]
+        scope['circuit'] = sorted(f['circuit_name'].unique().tolist())[:5]
+    return f, scope
+
+
+def _share(x):
+    return None if pd.isna(x) else round(float(x) * 100, 1)
+
+
+def f1_stats(df, start_year, end_year, team=None, driver=None, circuit=None):
+    f, scope = _filter(df, start_year, end_year, team, driver, circuit)
+    if f is None:
+        return scope
+    wins = f[f['win']]
+    starters = f[f['starter']]
+    poles = f[f['grid_clean'] == 1]
+    dnf_types = starters[starters['dnf']]['dnf_type'].value_counts(normalize=True)
+    return {
+        'scope': scope,
+        'races': int(f['raceId'].nunique()),
+        'entries': int(len(f)),
+        'wins': int(len(wins)),
+        'podiums': int(f['podium'].sum()),
+        'pole_starts': int(len(poles)),
+        'pole_starts_converted_to_win_pct': _share(poles['win'].mean()) if len(poles) else None,
+        'wins_from_pole_pct': _share((wins['grid_clean'] == 1).mean()) if len(wins) else None,
+        'wins_from_front_row_pct': _share((wins['grid_clean'] <= 2).mean()) if len(wins) else None,
+        'dnf_rate_among_starters_pct': _share(starters['dnf'].mean()) if len(starters) else None,
+        'retirement_causes_pct': {k: round(v * 100, 1) for k, v in dnf_types.items()},
+        'top_drivers_by_wins': wins['driver'].value_counts().head(5).to_dict(),
+        'top_teams_by_wins': wins['team'].value_counts().head(5).to_dict(),
+    }
+
+
+def leaderboard(df, by, metric, start_year, end_year, circuit=None, team=None, n=5):
+    f, scope = _filter(df, start_year, end_year, team=team, circuit=circuit)
+    if f is None:
+        return scope
+    col = 'driver' if by == 'driver' else 'team'
+    if metric == 'wins':
+        counts = f[f['win']][col].value_counts()
+    elif metric == 'podiums':
+        counts = f[f['podium']][col].value_counts()
+    else:
+        counts = f[f['grid_clean'] == 1][col].value_counts()
+    n = int(np.clip(n or 5, 1, 15))
+    return {'scope': scope, 'ranked_by': metric, 'rows': counts.head(n).to_dict()}
+
+
+def podium_chance(bundle, grid, team, year):
+    model, top_teams, columns, observed = bundle
+    grid = int(np.clip(int(grid), 1, 20))
+    year = int(np.clip(int(year), 2010, 2024))
+    group = next((t for t in top_teams if team.lower() in t.lower() or t.lower() in team.lower()), 'Other')
+    row = pd.get_dummies(pd.DataFrame({'grid_clean': [grid], 'team_group': [group], 'year': [year]}))
+    row = row.reindex(columns=columns, fill_value=0)
+    return {'grid': grid, 'team_used_by_model': group, 'year': year,
+            'predicted_podium_chance_pct': round(float(model.predict_proba(row)[0, 1]) * 100, 1),
+            'real_podium_rate_from_this_slot_2010_2024_pct': _share(observed.get(grid, np.nan)),
+            'model_teams': top_teams + ['Other']}
+
+
+def run_tool(name, args, df, bundle):
+    """Returns (json text, is_error)."""
+    try:
+        if name == 'f1_stats':
+            out = f1_stats(df, args['start_year'], args['end_year'], args.get('team'), args.get('driver'),
+                           args.get('circuit'))
+        elif name == 'leaderboard':
+            out = leaderboard(df, args['by'], args['metric'], args['start_year'], args['end_year'],
+                              args.get('circuit'), args.get('team'), args.get('n', 5))
+        elif name == 'podium_chance':
+            out = podium_chance(bundle, args['grid'], args['team'], args['year'])
+        else:
+            return json.dumps({'error': f'Unknown tool {name}'}), True
+    except (KeyError, TypeError, ValueError) as e:
+        return json.dumps({'error': f'Bad input: {e}'}), True
+    return json.dumps(out, default=str), 'error' in out
+
+
+# ---------------- talking to Claude ----------------
+def get_client():
+    key = None
+    try:
+        key = st.secrets.get('ANTHROPIC_API_KEY')
+    except Exception:
+        pass
+    key = key or os.environ.get('ANTHROPIC_API_KEY')
+    if not key:
+        return None
+    return anthropic.Anthropic(api_key=key)
+
+
+def answer(client, messages, df, bundle, max_steps=6):
+    """Runs one user turn (with tool calls) and returns Polly's reply text.
+
+    `messages` is appended to in place, so the history stays append-only between turns.
+    """
+    for _ in range(max_steps):
+        response = client.beta.messages.create(
+            model=MODEL,
+            max_tokens=16000,
+            system=SYSTEM,
+            tools=TOOLS,
+            messages=messages,
+            output_config={'effort': 'low'},
+            betas=['server-side-fallback-2026-07-01'],
+            fallbacks='default',
+        )
+        messages.append({'role': 'assistant', 'content': response.content})
+
+        if response.stop_reason == 'refusal':
+            return "Hmm, I can't help with that one. Ask me anything about the races, teams or drivers! 🏁"
+
+        if response.stop_reason == 'tool_use':
+            results = []
+            for block in response.content:
+                if block.type == 'tool_use':
+                    text, is_error = run_tool(block.name, block.input, df, bundle)
+                    result = {'type': 'tool_result', 'tool_use_id': block.id, 'content': text}
+                    if is_error:
+                        result['is_error'] = True
+                    results.append(result)
+            messages.append({'role': 'user', 'content': results})
+            continue
+
+        reply = ''.join(block.text for block in response.content if block.type == 'text').strip()
+        if response.stop_reason == 'max_tokens':
+            reply += ' …'
+        return reply or "I lost my notes for a second. Could you ask that again?"
+    return 'That one needed too many lookups. Could you ask it in a simpler way?'
+
+
+# ---------------- drawing Polly ----------------
+def chibi_svg(size=220, mood='happy', uid='p', head_only=False, animated=True):
+    """Polly as an inline SVG: red cap, red racing dress with a checkered hem, and a little checkered flag."""
+    view = '26 18 148 148' if head_only else '0 0 200 240'
+    height = size if head_only else int(size * 1.2)
+    chk = f'chk-{uid}'
+    if mood == 'wow':
+        mouth = ('<ellipse cx="100" cy="140" rx="5.5" ry="6.5" fill="#7A2E22"/>'
+                 '<ellipse cx="100" cy="143" rx="3" ry="2.2" fill="#FF8C9A"/>')
+    elif mood == 'oops':
+        mouth = ('<path d="M91 141 Q95.5 136 100 141 Q104.5 146 109 141" stroke="#7A2E22" stroke-width="2.6" '
+                 'fill="none" stroke-linecap="round"/>'
+                 '<path d="M153 98 Q160 110 153 117 Q146 110 153 98 Z" fill="#8FD3FF" opacity=".9"/>')
+    else:
+        mouth = ('<path d="M92 136 Q100 145 108 136" stroke="#7A2E22" stroke-width="2.6" fill="none" '
+                 'stroke-linecap="round"/>')
+    eye = ('<ellipse cx="{x}" cy="118" rx="10.5" ry="13.5" fill="#2A1712"/>'
+           '<ellipse cx="{x}" cy="121.5" rx="7.5" ry="8.5" fill="#8A4526"/>'
+           '<circle cx="{hx}" cy="112" r="3.8" fill="#fff"/><circle cx="{sx}" cy="124.5" r="1.7" fill="#fff"/>')
+    eyes = eye.format(x=78, hx=74, sx=81.5) + eye.format(x=122, hx=118, sx=125.5)
+    cls = 'chibi animated' if animated else 'chibi'
+    return f"""<svg class="{cls}" width="{size}" height="{height}" viewBox="{view}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Polly, a chibi girl in a red racing cap and dress">
+<defs><pattern id="{chk}" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#fff"/><rect width="4" height="4" fill="#15151a"/><rect x="4" y="4" width="4" height="4" fill="#15151a"/></pattern></defs>
+<ellipse cx="100" cy="232" rx="44" ry="6" fill="#000" opacity=".35"/>
+<g class="bob">
+<ellipse cx="38" cy="134" rx="15" ry="32" fill="#3B2420" transform="rotate(14 38 134)"/>
+<ellipse cx="162" cy="134" rx="15" ry="32" fill="#3B2420" transform="rotate(-14 162 134)"/>
+<circle cx="47" cy="100" r="5" fill="{RED}"/><circle cx="153" cy="100" r="5" fill="{RED}"/>
+<rect x="84" y="206" width="12" height="19" rx="6" fill="#FFE3D3"/><rect x="104" y="206" width="12" height="19" rx="6" fill="#FFE3D3"/>
+<ellipse cx="89" cy="226" rx="10" ry="5.5" fill="#F5F5F7"/><ellipse cx="111" cy="226" rx="10" ry="5.5" fill="#F5F5F7"/>
+<path d="M82 224 h14 M104 224 h14" stroke="{RED}" stroke-width="2"/>
+<path d="M78 156 L122 156 L145 210 Q100 219 55 210 Z" fill="{RED}"/>
+<path d="M57 203 Q100 211 143 203 L145 210 Q100 219 55 210 Z" fill="url(#{chk})"/>
+<path d="M83 158 L67 203 M117 158 L133 203" stroke="#fff" stroke-width="2.5" opacity=".9"/>
+<path d="M87 156 L100 168 L113 156 Z" fill="#fff"/>
+<circle cx="100" cy="185" r="9.5" fill="#fff"/><text x="100" y="189" text-anchor="middle" font-size="9.5" font-weight="800" fill="{RED}" font-family="Helvetica, Arial, sans-serif">P1</text>
+<path d="M81 162 Q67 175 65 188" stroke="{RED}" stroke-width="9" stroke-linecap="round" fill="none"/>
+<circle cx="64" cy="191" r="6" fill="#FFE3D3"/>
+<circle cx="100" cy="99" r="64" fill="#3B2420"/>
+<ellipse cx="100" cy="109" rx="56" ry="52" fill="#FFE3D3"/>
+<path d="M45 106 Q47 64 100 58 Q153 64 155 106 Q145 86 131 93 Q121 76 105 89 Q92 74 80 91 Q66 80 56 99 Z" fill="#3B2420"/>
+<path d="M39 87 Q43 33 100 29 Q157 33 161 87 Q100 75 39 87 Z" fill="{RED}"/>
+<path d="M53 64 Q100 49 147 64" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round"/>
+<rect x="91" y="38" width="18" height="14" rx="2.5" fill="url(#{chk})" stroke="#fff" stroke-width="1.2"/>
+<circle cx="100" cy="30" r="4.2" fill="#C41C0E"/>
+<path d="M37 87 Q100 71 163 87 Q171 93 161 97 Q100 85 39 97 Q29 93 37 87 Z" fill="#C41C0E"/>
+<path d="M45 95 Q38 128 50 152 Q54 126 63 101 Z" fill="#3B2420"/>
+<path d="M155 95 Q162 128 150 152 Q146 126 137 101 Z" fill="#3B2420"/>
+<path d="M118 160 Q140 164 157 147" stroke="{RED}" stroke-width="9" stroke-linecap="round" fill="none"/>
+<g class="flag"><line x1="160" y1="148" x2="167" y2="88" stroke="#D9D9DE" stroke-width="3" stroke-linecap="round"/>
+<path d="M167 89 Q181 83 197 90 L195 115 Q180 109 166 114 Z" fill="url(#{chk})" stroke="#15151a" stroke-width="1"/></g>
+<circle cx="159" cy="146" r="6.5" fill="#FFE3D3"/>
+<g class="eyes">{eyes}</g>
+<ellipse cx="63" cy="135" rx="8.5" ry="4.8" fill="#FF7A90" opacity=".55"/><ellipse cx="137" cy="135" rx="8.5" ry="4.8" fill="#FF7A90" opacity=".55"/>
+{mouth}
+</g></svg>"""
+
+
+def avatar_uri():
+    svg = chibi_svg(64, uid='av', head_only=True, animated=False)
+    return 'data:image/svg+xml;base64,' + base64.b64encode(svg.encode()).decode()
+
+
+CHIBI_CSS = """
+.chibi.animated .bob { animation: polly-bob 2.8s ease-in-out infinite; transform-origin: 100px 230px; }
+.chibi.animated .eyes { animation: polly-blink 4.6s infinite; transform-box: fill-box; transform-origin: center; }
+.chibi.animated .flag { animation: polly-wave 1.4s ease-in-out infinite; transform-box: fill-box; transform-origin: 0% 100%; }
+@keyframes polly-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes polly-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+@keyframes polly-wave { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(6deg); } }
+@media (prefers-reduced-motion: reduce) { .chibi.animated .bob, .chibi.animated .eyes, .chibi.animated .flag { animation: none; } }
+
+.polly-card { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 18px 10px 6px;
+  background: radial-gradient(closest-side, rgba(255,43,23,0.18), transparent 75%); }
+.polly-name { color: #F5F5F7; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-top: 6px; }
+.polly-role { color: #6E6E73; font-size: 13px; margin-top: 2px; }
+.bubble { position: relative; background: #F5F5F7; color: #111114; font-size: 14px; line-height: 1.45; padding: 10px 14px;
+  border-radius: 16px; margin-bottom: 14px; max-width: 260px; }
+.bubble:after { content: ''; position: absolute; left: 50%; bottom: -7px; margin-left: -7px; border: 7px solid transparent;
+  border-bottom: 0; border-top-color: #F5F5F7; }
+
+.polly-peek { position: fixed; right: 22px; bottom: 16px; z-index: 1000; display: flex; align-items: flex-end; gap: 6px; pointer-events: none; }
+.polly-peek .bubble { margin: 0 0 70px 0; max-width: 200px; font-size: 13px; border-radius: 14px 14px 4px 14px;
+  animation: polly-hello 10s ease forwards; }
+.polly-peek .bubble:after { display: none; }
+@keyframes polly-hello { 0% { opacity: 0; transform: translateY(6px); } 10%, 82% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+@media (max-width: 760px) { .polly-peek { display: none; } }
+"""
+
+
+def peek():
+    """Small Polly in the bottom-right corner of every page."""
+    st.markdown('<div class="polly-peek"><div class="bubble">Hi, I\'m Polly! Ask me anything in the '
+                '<b>Ask Polly</b> tab 🏁</div>' + chibi_svg(92, uid='peek') + '</div>', unsafe_allow_html=True)
+
+
+# ---------------- the chat tab ----------------
+SUGGESTIONS = ['Who won the most races at Monaco?', 'How often did Ferrari win from pole since 2010?',
+               'What is the podium chance from P6 for McLaren in 2024?', "What was Mercedes' best era?"]
+
+
+def _queue_suggestion():
+    st.session_state['polly_pending'] = st.session_state.get('polly_suggest')
+    st.session_state['polly_suggest'] = None
+
+
+@st.fragment
+def chat(df, bundle, filters_text):
+    state = st.session_state
+    state.setdefault('polly_history', [])   # what Claude sees, append-only
+    state.setdefault('polly_chat', [])      # what the page shows
+    state.setdefault('polly_mood', 'happy')
+
+    left, right = st.columns([1, 2.3], gap='large')
+    card = left.empty()
+    with right:
+        box = st.container(height=440, border=True)
+        messages_slot = box.empty()
+        st.pills('Try asking', SUGGESTIONS, key='polly_suggest', on_change=_queue_suggestion,
+                 label_visibility='collapsed')
+        typed = st.chat_input('Ask Polly about F1…', key='polly_input')
+
+    def show_messages():
+        with messages_slot.container():
+            if not state['polly_chat']:
+                st.markdown('<div class="note" style="padding:8px 4px">No messages yet. Pick a question below or '
+                            'type your own.</div>', unsafe_allow_html=True)
+            for role, text in state['polly_chat']:
+                with st.chat_message(role, avatar=avatar_uri() if role == 'assistant' else '🧑'):
+                    st.markdown(text)
+
+    question = typed or state.pop('polly_pending', None)
+    client = get_client()
+
+    if question:
+        state['polly_chat'].append(('user', question))
+        if client is None:
+            reply = 'I need an API key to talk! Add `ANTHROPIC_API_KEY` to `.streamlit/secrets.toml` and restart the app.'
+            state['polly_mood'] = 'oops'
+        else:
+            history = state['polly_history']
+            start = len(history)
+            history.append({'role': 'user', 'content': f'[{filters_text}]\n{question}'})
+            show_messages()
+            with box, st.spinner('Polly is checking the data…'):
+                try:
+                    reply = answer(client, history, df, bundle)
+                    state['polly_mood'] = 'wow' if len(state['polly_chat']) <= 2 else 'happy'
+                except anthropic.AuthenticationError:
+                    reply, state['polly_mood'] = 'My API key was not accepted. It may have expired.', 'oops'
+                except anthropic.RateLimitError:
+                    reply, state['polly_mood'] = 'Too many questions at once! Give me a few seconds.', 'oops'
+                except (anthropic.APIStatusError, anthropic.APIConnectionError):
+                    reply, state['polly_mood'] = "I can't reach my brain right now. Check the internet and try again.", 'oops'
+            if state['polly_mood'] == 'oops':
+                del history[start:]  # forget the failed turn so the history Claude sees stays valid
+        state['polly_chat'].append(('assistant', reply))
+
+    greeting = ('Ask me about any race, team or driver from 1950 to 2024. I look up every number in the data!'
+                if not state['polly_chat'] else
+                {'happy': 'Got it! Anything else?', 'wow': 'Ooh, good question!',
+                 'oops': 'Oops, something went wrong.'}[state['polly_mood']])
+    card.markdown(f'<div class="polly-card"><div class="bubble">{greeting}</div>'
+                  f'{chibi_svg(210, mood=state["polly_mood"], uid="big")}'
+                  '<div class="polly-name">Polly</div><div class="polly-role">Your pit-wall assistant · '
+                  'powered by Claude</div></div>', unsafe_allow_html=True)
+    show_messages()
+    if client is None:
+        st.caption('Polly needs an `ANTHROPIC_API_KEY` in `.streamlit/secrets.toml` to answer.')

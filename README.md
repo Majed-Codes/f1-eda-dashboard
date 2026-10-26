@@ -60,6 +60,24 @@ streamlit run app/app.py
 The dark/red theme is in `app/.streamlit/config.toml`. Streamlit reads the config from the folder
 you run the command in, so the same file is also at `.streamlit/config.toml` in the repo root.
 
+### Ask Polly (AI assistant)
+
+The **Ask Polly** tab has a chibi assistant that answers questions about the data. Her answers come from Claude
+(`claude-opus-5-5`), and every number she gives comes from tools that query `clean_data.csv`, so she does not guess
+statistics. To turn her on, create `.streamlit/secrets.toml` in the repo root:
+
+```toml
+ANTHROPIC_API_KEY = "your-key-here"
+```
+
+The file is in `.gitignore`, so the key is never committed. Without a key the rest of the dashboard still works and
+Polly explains how to add one. Each question costs a few cents of API credit.
+
+### Podium or Not? (mini game)
+
+The **Play** tab shows a real start from 2010-2024 (driver, team, grid slot). Guess if it ended on the podium and try
+to beat the podium model over 10 rounds.
+
 ## Build the PDF report
 
 ```bash
