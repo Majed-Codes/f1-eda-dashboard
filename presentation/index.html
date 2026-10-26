@@ -1,0 +1,815 @@
+<title>Lights Out</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@400;700;900&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+/* Layout: a 1920x1080 broadcast stage, letterboxed and scaled to the window; F1 TV timing graphics over asphalt, one red start-light accent, sector colours used only where timing is the metaphor. Seven slides, one idea each; clicks reveal the next step inside a slide. */
+:root{
+  color-scheme: dark;
+  --asphalt:#0A0A0C; --carbon:#131418; --panel:#1A1B20; --line:#2A2B33;
+  --chalk:#EEEAE2; --mute:#8F929B; --dim:#5C5F68;
+  --red:#FF2B17; --red-deep:#7A0E05;
+  --s-purple:#B45CFF; --s-green:#27D36A; --s-yellow:#FFD21A;
+  --f-display:'Big Shoulders Display', 'Arial Narrow', Impact, sans-serif;
+  --f-body:'Barlow', 'Helvetica Neue', Arial, sans-serif;
+  --f-mono:'JetBrains Mono', 'Courier New', monospace;
+}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{margin:0;background:var(--asphalt);color:var(--chalk);font-family:var(--f-body);overflow:hidden;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:0;box-sizing:border-box}
+#viewport{position:relative;width:100%;height:100%;display:grid;place-items:center}
+#stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:0 0;background:var(--asphalt);overflow:hidden}
+
+/* atmosphere, kept quiet so the numbers lead */
+#streaks{position:absolute;inset:0;width:1920px;height:1080px;opacity:.45}
+.vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%, transparent 45%, rgba(0,0,0,.75) 100%);z-index:40}
+.grain{position:absolute;inset:-50%;pointer-events:none;z-index:41;opacity:.05;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation:grain 1s steps(6) infinite}
+@keyframes grain{0%{transform:translate(0,0)}20%{transform:translate(-3%,2%)}40%{transform:translate(2%,-3%)}60%{transform:translate(-2%,-1%)}80%{transform:translate(3%,3%)}100%{transform:translate(0,0)}}
+.scan{position:absolute;inset:0;pointer-events:none;z-index:42;opacity:.03;background:repeating-linear-gradient(0deg, var(--chalk) 0 1px, transparent 1px 4px)}
+#sweep{position:absolute;top:-10%;left:0;width:1400px;height:120%;z-index:50;pointer-events:none;transform:translateX(-2000px) skewX(-14deg);
+  background:linear-gradient(90deg, transparent 0%, rgba(255,43,23,.0) 10%, rgba(255,43,23,.85) 55%, var(--chalk) 62%, var(--red) 66%, transparent 100%);filter:blur(6px)}
+
+/* HUD */
+.hud{position:absolute;left:0;right:0;z-index:30;display:flex;align-items:center;justify-content:space-between;padding:0 140px;font-family:var(--f-mono);font-size:22px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.hud.top{top:44px}
+.hud.bottom{bottom:40px}
+.lap b{color:var(--chalk);font-weight:700}
+.lap .tag{display:inline-block;background:var(--red);color:var(--asphalt);font-weight:700;padding:4px 10px;margin-right:16px;letter-spacing:.1em}
+.sectors{display:flex;gap:6px;width:640px}
+.sectors i{flex:1;height:8px;background:var(--line);transition:background .4s}
+.sectors i.done{background:var(--s-green)}
+.sectors i.now{background:var(--s-purple)}
+.nav{display:flex;gap:12px}
+.nav button{font:inherit;color:var(--chalk);background:var(--panel);border:1px solid var(--line);width:64px;height:48px;cursor:pointer;font-size:24px}
+.nav button:hover{background:var(--red);color:var(--asphalt);border-color:var(--red)}
+.nav button:focus-visible{outline:3px solid var(--s-yellow);outline-offset:3px}
+
+/* slides, and beats: steps inside one slide */
+.slide{position:absolute;inset:0;padding:140px 140px 130px;display:flex;flex-direction:column;gap:28px;visibility:hidden;z-index:10}
+.slide.active{visibility:visible}
+.slide.has-beats{padding:0}
+.beat{position:absolute;inset:0;padding:140px 140px 130px;display:flex;flex-direction:column;gap:28px;visibility:hidden}
+.slide.active .beat.on{visibility:visible}
+.beatbar{position:absolute;top:118px;right:140px;display:flex;gap:8px;z-index:12}
+.beatbar i{width:56px;height:6px;background:var(--line);transition:background .3s}
+.beatbar i.on{background:var(--red)}
+[data-step]{visibility:hidden}
+.slide.active [data-step].shown{visibility:visible}
+.eyebrow{font-family:var(--f-mono);font-size:24px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--red);display:flex;align-items:center;gap:18px}
+.eyebrow::before{content:"";width:48px;height:4px;background:var(--red)}
+h1,h2,h3{margin:0;font-family:var(--f-display);text-transform:uppercase;text-wrap:balance;font-weight:900;line-height:.92;letter-spacing:.005em}
+h2{font-size:104px;max-width:1560px}
+h3{font-size:44px;font-weight:700;line-height:1}
+p{margin:0}
+.lede{font-size:32px;line-height:1.45;color:#C8C4BC;max-width:1100px}
+.src{font-family:var(--f-mono);font-size:20px;color:var(--dim);letter-spacing:.06em;margin-top:auto}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-weight:700}
+.red{color:var(--red)}
+
+/* 1 title */
+#s1{justify-content:flex-end;padding-bottom:180px}
+.ghost{position:absolute;left:-30px;top:330px;font-family:var(--f-display);font-weight:900;font-size:420px;line-height:.8;text-transform:uppercase;white-space:nowrap;color:transparent;-webkit-text-stroke:2px rgba(238,234,226,.09);letter-spacing:-.01em;pointer-events:none}
+.gantry{position:absolute;top:150px;right:140px;display:flex;gap:26px;padding:22px 28px;background:linear-gradient(#18191D,#0E0E11);border:2px solid var(--line);border-radius:10px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.gantry::before{content:"";position:absolute;left:-200px;right:-200px;top:50%;height:14px;background:#15161A;z-index:-1;border-block:1px solid var(--line)}
+.pod{display:flex;flex-direction:column;gap:14px;background:#050506;padding:13px;border-radius:40px}
+.bulb{width:64px;height:64px;border-radius:50%;background:radial-gradient(circle at 35% 30%, #3A120E, #1C0705 70%);transition:background .06s, box-shadow .06s}
+.pod.on .bulb{background:radial-gradient(circle at 35% 30%, #FFB3A8, var(--red) 40%, #B01204 80%);box-shadow:0 0 40px 10px rgba(255,43,23,.55), 0 0 120px 30px rgba(255,43,23,.25)}
+.flash{position:absolute;inset:0;background:var(--chalk);opacity:0;pointer-events:none;z-index:20}
+#s1 h1{font-size:170px;max-width:1250px;position:relative}
+#s1 h1 .w{display:inline-block}
+.byline{display:flex;gap:40px;align-items:baseline;border-top:2px solid var(--line);padding-top:28px;font-size:30px}
+.byline .name{font-weight:600}
+.byline .meta{color:var(--mute)}
+
+/* 2 dataset */
+.bignum{font-family:var(--f-display);font-weight:900;font-size:290px;line-height:.82;letter-spacing:-.005em}
+.bignum + .lede{margin-top:-6px}
+.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:28px;margin-top:10px}
+.fact{border-top:6px solid var(--c);padding-top:18px;display:flex;flex-direction:column;gap:6px}
+.fact .num{font-size:76px;line-height:1}
+.fact span{font-size:24px;color:var(--mute);text-transform:uppercase;letter-spacing:.12em;font-family:var(--f-mono)}
+.merge{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.chip{font-family:var(--f-mono);font-size:22px;padding:10px 16px;border:1px solid var(--line);color:var(--chalk);background:var(--carbon);letter-spacing:.04em}
+.merge .arrow{font-family:var(--f-mono);font-size:30px;color:var(--red);margin:0 10px}
+.chip.csv{background:var(--red);color:var(--asphalt);border-color:var(--red);font-weight:700}
+.merge .note{font-size:22px;color:var(--mute);margin-left:18px}
+
+/* 3 problem */
+.sectorcards{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:auto}
+.scard{position:relative;background:var(--carbon);border:1px solid var(--line);padding:40px 40px 44px;display:flex;flex-direction:column;gap:22px;min-height:420px;overflow:hidden}
+.scard .bar{position:absolute;left:0;top:0;right:0;height:10px}
+.scard .sid{display:flex;justify-content:space-between;align-items:center;font-family:var(--f-mono);font-size:24px;letter-spacing:.14em}
+.scard .sid b{font-size:52px;letter-spacing:0}
+.scard h3{font-size:58px;line-height:.98}
+.scard p{font-size:26px;line-height:1.45;color:var(--mute);margin-top:auto}
+.scard p b{color:var(--chalk);font-weight:600}
+.scard .big{position:absolute;right:-10px;bottom:-60px;font-family:var(--f-display);font-weight:900;font-size:280px;line-height:1;color:transparent;-webkit-text-stroke:2px rgba(238,234,226,.06)}
+
+/* 4a grid vs result */
+.pacewrap{flex:1;display:grid;grid-template-columns:1fr 440px;gap:80px;align-items:end}
+.chart{display:flex;flex-direction:column;gap:16px}
+.bars{display:flex;align-items:flex-end;gap:22px;height:330px;border-bottom:2px solid var(--line);position:relative}
+.bars .gl{position:absolute;left:0;right:0;border-top:1px dashed var(--line)}
+.bars .gl span{position:absolute;right:100%;transform:translate(-14px,-50%);font-family:var(--f-mono);font-size:20px;color:var(--dim)}
+.col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:10px;height:100%;position:relative;z-index:1}
+.col .v{font-family:var(--f-mono);font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
+.col .b{width:100%;background:linear-gradient(180deg,#5A5C66,#2C2D34);transform-origin:bottom}
+.col.hot .b{background:linear-gradient(180deg,#FF6A55,var(--red) 30%,#9E1407)}
+.col.hot .v{color:var(--chalk)}
+.col:not(.hot) .v{color:var(--mute)}
+.xlab{display:flex;gap:22px}
+.xlab span{flex:1;text-align:center;font-family:var(--f-mono);font-size:24px;color:var(--mute)}
+.xlab span.hot{color:var(--chalk);font-weight:700}
+.cap{font-size:22px;color:var(--mute)}
+.stat{border-left:8px solid var(--red);background:var(--carbon);padding:30px 34px;display:flex;flex-direction:column;gap:8px}
+.stat .num{font-size:92px;line-height:1}
+.stat p{font-size:24px;line-height:1.4;color:#C8C4BC}
+.stats{display:flex;flex-direction:column;gap:24px}
+
+/* 4b heatmap */
+.hmwrap{flex:1;display:grid;grid-template-columns:auto 1fr;gap:80px;align-items:end;min-height:0}
+.hm{display:grid;grid-template-columns:56px repeat(20,26px);grid-template-rows:repeat(20,20px) 30px;gap:2px;position:relative}
+.hm .c{border-radius:2px;transition:outline-color .15s;outline:2px solid transparent;outline-offset:-1px}
+.hm .c:hover{outline-color:var(--chalk)}
+.hm .rl{font-family:var(--f-mono);font-size:16px;color:var(--mute);display:flex;align-items:center;justify-content:flex-end;padding-right:10px}
+.hm .cl{font-family:var(--f-mono);font-size:16px;color:var(--mute);display:flex;align-items:flex-end;justify-content:center}
+.axis{font-family:var(--f-mono);font-size:20px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.hmside{display:flex;flex-direction:column;gap:18px;max-width:640px}
+.hmside .stat{padding:16px 26px}
+.hmside .stat .num{font-size:52px}
+.ramp{display:flex;flex-direction:column;gap:8px}
+.ramp .g{height:16px;background:linear-gradient(90deg,#16171B,#5A1309 25%,#C41C0B 55%,#FF6A55 80%,#FFE3DC)}
+.ramp .t{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:18px;color:var(--mute)}
+
+/* 4c reliability */
+.relwrap{flex:1;min-height:0;display:grid;grid-template-columns:1fr 420px;gap:70px;align-items:end}
+.rel svg{width:100%;height:auto;max-height:360px;display:block;overflow:visible}
+.legend{display:flex;gap:36px;font-size:24px;color:var(--mute);margin-top:12px}
+.legend i{display:inline-block;width:36px;height:6px;vertical-align:middle;margin-right:10px}
+.split{display:flex;flex-direction:column;gap:12px;background:var(--carbon);padding:24px 28px}
+.split .h{font-family:var(--f-mono);font-size:18px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+.split .bar{display:flex;height:26px;gap:3px}
+.split .bar i{display:block;height:100%;transform-origin:left}
+.split .k{display:flex;flex-direction:column;gap:6px;font-size:22px}
+.split .k span{display:flex;justify-content:space-between}
+.split .k span b{font-family:var(--f-mono)}
+.split .k em{font-style:normal;display:inline-flex;align-items:center;gap:10px}
+.split .k em::before{content:"";width:14px;height:14px;background:var(--sw)}
+
+/* 4d dominance */
+.eras{display:flex;flex-direction:column;margin-top:8px;border-top:1px solid var(--line)}
+.era{display:grid;grid-template-columns:180px 300px 1fr 260px;align-items:center;gap:30px;padding:7px 0;border-bottom:1px solid var(--line)}
+.era .yr{font-family:var(--f-mono);font-size:24px;color:var(--mute)}
+.era .tm{font-family:var(--f-display);font-size:36px;font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+.era .track{height:22px;background:var(--panel);position:relative}
+.era .fill{position:absolute;left:0;top:0;bottom:0;background:var(--chalk);transform-origin:left}
+.era.peak .fill{background:linear-gradient(90deg,#9E1407,var(--red))}
+.era.peak .tm{color:var(--red)}
+.era .pc{font-family:var(--f-mono);font-size:26px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.era .pc small{font-size:18px;font-weight:400;color:var(--dim);margin-left:12px}
+.drivers{display:flex;gap:44px;align-items:baseline;font-size:24px;color:var(--mute);margin-top:6px}
+.drivers .k{font-family:var(--f-mono);font-size:18px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.drivers b{font-family:var(--f-display);font-size:34px;font-weight:700;color:var(--chalk);text-transform:uppercase;margin-right:8px}
+
+/* 5 dashboard */
+.pitwrap{flex:1;display:grid;grid-template-columns:1fr 470px;gap:60px;align-items:start;min-height:0}
+.laptop{display:flex;flex-direction:column;align-items:center}
+.lid{position:relative;width:100%;background:#050506;border:14px solid #1B1C21;border-bottom-width:18px;border-radius:24px 24px 0 0;box-shadow:0 50px 120px rgba(0,0,0,.75), 0 0 0 1px #2E2F36}
+.lid img{display:block;width:100%;height:auto}
+.base{width:108%;height:22px;background:linear-gradient(180deg,#3A3B42,#17181C);border-radius:0 0 20px 20px;position:relative}
+.base::before{content:"";position:absolute;left:50%;top:0;width:180px;height:8px;transform:translateX(-50%);background:#0E0E11;border-radius:0 0 10px 10px}
+.pin{position:absolute;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:var(--red);color:var(--asphalt);font-family:var(--f-mono);font-weight:700;font-size:26px;display:grid;place-items:center;box-shadow:0 0 0 6px rgba(255,43,23,.25)}
+.pin::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--red);animation:ping 1.8s ease-out infinite}
+@keyframes ping{from{transform:scale(1);opacity:.9}to{transform:scale(1.9);opacity:0}}
+.radio{display:flex;flex-direction:column;gap:22px}
+.radiocard{background:var(--carbon);border:1px solid var(--line);padding:28px 30px;display:flex;flex-direction:column;gap:14px}
+.radiocard .who{display:flex;align-items:center;gap:14px;font-family:var(--f-mono);font-size:20px;letter-spacing:.14em;color:var(--mute)}
+.wave{display:flex;align-items:center;gap:4px;height:40px}
+.wave i{width:6px;background:var(--red);border-radius:3px;height:20%}
+.radiocard q{font-family:var(--f-display);font-size:52px;font-weight:900;text-transform:uppercase;line-height:.95;quotes:none}
+.features{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.features li{display:grid;grid-template-columns:44px 1fr;gap:16px;align-items:start;padding:16px 0;border-bottom:1px solid var(--line)}
+.features li b{width:34px;height:34px;border-radius:50%;background:var(--red);color:var(--asphalt);font-family:var(--f-mono);font-size:18px;display:grid;place-items:center;margin-top:2px}
+.features li b.plain{background:var(--panel);color:var(--mute)}
+.features li span{font-size:24px;line-height:1.35}
+.features li small{display:block;font-size:20px;color:var(--mute)}
+
+/* 6 insights */
+#s8{background:radial-gradient(ellipse at 50% 110%, rgba(255,43,23,.22), transparent 60%)}
+#sparks{position:absolute;inset:0;width:1920px;height:1080px;pointer-events:none;z-index:5}
+.podium{flex:1;display:grid;grid-template-columns:1fr 1.1fr 1fr;gap:26px;align-items:end}
+.step{display:flex;flex-direction:column;gap:22px}
+.step .txt{display:flex;flex-direction:column;gap:12px;padding:0 6px}
+.step .txt h3{font-size:46px}
+.step .txt p{font-size:25px;line-height:1.45;color:#C8C4BC}
+.block{background:linear-gradient(180deg,#24252B,#121317);border:1px solid var(--line);border-top:6px solid var(--chalk);display:flex;align-items:flex-start;justify-content:space-between;padding:24px 30px;transform-origin:bottom}
+.block .p{font-family:var(--f-display);font-weight:900;font-size:120px;line-height:.9}
+.block .n{font-family:var(--f-mono);font-size:56px;font-weight:700;text-align:right;line-height:1}
+.block .n small{display:block;font-size:18px;font-weight:400;color:var(--mute);margin-top:8px;letter-spacing:.08em;text-transform:uppercase}
+.step.p1 .block{height:330px;border-top-color:var(--red)}
+.step.p1 .block .p{color:var(--red)}
+.step.p2 .block{height:240px}
+.step.p3 .block{height:180px}
+
+/* 7 conclusion */
+#s9{display:grid;grid-template-columns:1fr 1fr;column-gap:90px;row-gap:26px;grid-template-rows:auto auto auto 1fr}
+#s9 .eyebrow,#s9 .answer,#s9 .lede{grid-column:1/-1}
+#s9 .answer{font-size:190px;line-height:.85}
+#s9 .answer span{color:var(--red)}
+#s9 .lede{max-width:none}
+#flag{position:absolute;right:0;top:0;width:900px;height:1080px;opacity:.22;pointer-events:none;z-index:0}
+.listcard{position:relative;z-index:1;display:flex;flex-direction:column;gap:14px;align-self:start}
+.listcard h3{font-size:40px;color:var(--mute)}
+.listcard ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.listcard li{display:grid;grid-template-columns:60px 1fr;gap:12px;padding:14px 0;border-bottom:1px solid var(--line);font-size:26px;line-height:1.35}
+.listcard li b{font-family:var(--f-mono);color:var(--red);font-size:22px;padding-top:4px}
+.questions{position:absolute;right:140px;bottom:130px;z-index:2;font-family:var(--f-display);font-weight:900;font-size:120px;line-height:1;text-transform:uppercase;color:var(--chalk)}
+.questions span{color:var(--red)}
+
+/* notes, lap menu, tooltip */
+#notes{position:absolute;left:140px;right:140px;bottom:110px;z-index:60;background:rgba(10,10,12,.94);border:1px solid var(--line);border-left:6px solid var(--s-yellow);padding:26px 32px;font-size:28px;line-height:1.5;color:var(--chalk)}
+#notes .k{font-family:var(--f-mono);font-size:18px;color:var(--s-yellow);letter-spacing:.14em;text-transform:uppercase;display:block;margin-bottom:8px}
+.clock{display:flex;align-items:center;gap:14px}
+.clock b{font-family:var(--f-mono);font-size:26px;color:var(--chalk);font-variant-numeric:tabular-nums;min-width:86px}
+.clock.warn b{color:var(--s-yellow)}
+.clock.over b{color:var(--red)}
+.clock .dot{width:10px;height:10px;border-radius:50%;background:var(--dim)}
+.clock.run .dot{background:var(--s-green);box-shadow:0 0 12px var(--s-green)}
+.hudr{display:flex;align-items:center;gap:40px}
+#menuBtn{width:auto;font:inherit;font-size:20px;letter-spacing:.14em;text-transform:uppercase;color:var(--chalk);background:var(--panel);border:1px solid var(--line);padding:8px 16px;cursor:pointer}
+#menuBtn:hover{border-color:var(--red)}
+#menuBtn:focus-visible,.lapmenu button:focus-visible{outline:3px solid var(--s-yellow);outline-offset:3px}
+.lapmenu{position:absolute;inset:0;z-index:70;background:rgba(8,8,10,.94);backdrop-filter:blur(8px);padding:140px;display:flex;flex-direction:column;gap:30px}
+.lapmenu h3{font-size:72px}
+.lapgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.lapmenu button{font:inherit;text-align:left;background:var(--carbon);border:1px solid var(--line);color:var(--chalk);padding:24px 26px;cursor:pointer;display:flex;flex-direction:column;gap:10px}
+.lapmenu button span{font-family:var(--f-mono);font-size:20px;color:var(--mute);letter-spacing:.12em}
+.lapmenu button b{font-family:var(--f-display);font-size:40px;font-weight:700;text-transform:uppercase}
+.lapmenu button.cur{border-color:var(--red);box-shadow:inset 0 0 0 1px var(--red)}
+.lapmenu button:hover{background:var(--panel)}
+#tip{position:absolute;z-index:65;pointer-events:none;background:#050506;border:1px solid var(--line);border-left:4px solid var(--red);padding:12px 16px;font-family:var(--f-mono);font-size:20px;color:var(--chalk);white-space:nowrap;box-shadow:0 20px 50px rgba(0,0,0,.6)}
+[data-tip]{cursor:crosshair}
+
+@media (prefers-reduced-motion: reduce){.grain{animation:none}.pin::after{animation:none}}
+</style>
+
+<div id="viewport">
+<div id="stage" role="region" aria-roledescription="slide deck" aria-label="Lights Out presentation">
+  <canvas id="streaks" width="1920" height="1080" aria-hidden="true"></canvas>
+
+  <!-- 1 TITLE -->
+  <section class="slide active" id="s1" data-name="Lights out" data-notes="Let the five lights run while you open. When they go out: since 2010, the driver on pole won about half of all races, and the front row won 77%. So my question is simple: is the race already decided on Saturday, in qualifying?">
+    <div class="ghost" aria-hidden="true">Lights out</div>
+    <div class="gantry" aria-hidden="true">
+      <div class="pod"><div class="bulb"></div><div class="bulb"></div></div>
+      <div class="pod"><div class="bulb"></div><div class="bulb"></div></div>
+      <div class="pod"><div class="bulb"></div><div class="bulb"></div></div>
+      <div class="pod"><div class="bulb"></div><div class="bulb"></div></div>
+      <div class="pod"><div class="bulb"></div><div class="bulb"></div></div>
+    </div>
+    <div class="flash" aria-hidden="true"></div>
+    <p class="eyebrow" data-in>F1 World Championship · 1950–2024</p>
+    <h1 id="title"><span class="w">Is</span> <span class="w">the</span> <span class="w">race</span> <span class="w">decided</span> <span class="w">on</span> <span class="w red">Saturday?</span></h1>
+    <div class="byline" data-in>
+      <span class="name">Majed Alotaibi</span>
+      <span class="meta">Tuwaiq Academy · Unit 3 Final Project · Data Exploration &amp; Dashboard</span>
+    </div>
+  </section>
+
+  <!-- 2 DATASET -->
+  <section class="slide" id="s2" data-name="Dataset" data-notes="My data is the Formula 1 World Championship dataset on Kaggle, built from the Ergast API. It has 26,759 race results, one row for every driver in every race from 1950 to 2024. (click) That is 75 seasons, 1,125 races, 861 drivers and 211 teams. (click) The dataset comes as 14 CSV files. I used six, merged them on their ID columns and cleaned them into one file, clean_data.csv.">
+    <p class="eyebrow" data-in>Dataset overview</p>
+    <div class="bignum num" data-in data-count="26759">26,759</div>
+    <p class="lede" data-in>race results. One row for every driver in every Formula 1 race since 1950.</p>
+    <div class="facts" data-step="1">
+      <div class="fact" style="--c:var(--red)"><b class="num" data-count="75">75</b><span>Seasons</span></div>
+      <div class="fact" style="--c:var(--s-purple)"><b class="num" data-count="1125">1,125</b><span>Grands Prix</span></div>
+      <div class="fact" style="--c:var(--s-green)"><b class="num" data-count="861">861</b><span>Drivers</span></div>
+      <div class="fact" style="--c:var(--s-yellow)"><b class="num" data-count="211">211</b><span>Constructors</span></div>
+    </div>
+    <div class="merge" data-step="2">
+      <span class="chip">results</span><span class="chip">races</span><span class="chip">drivers</span><span class="chip">constructors</span><span class="chip">status</span><span class="chip">circuits</span>
+      <span class="arrow">→</span><span class="chip csv">clean_data.csv</span>
+      <span class="note">6 of the 14 CSVs, merged on their IDs</span>
+    </div>
+    <p class="src">Source: Kaggle · Formula 1 World Championship (1950–2020), Rohan Rao · Ergast data, updated to 2024</p>
+  </section>
+
+  <!-- 3 PROBLEM -->
+  <section class="slide" id="s3" data-name="Problem" data-notes="I split the main question into three parts, like the three sectors of a lap. One: how much does the starting grid decide the result? Two: does one team own each era? Three: have the cars stopped breaking down? These were my guesses before I looked at the data. The next slide checks each one.">
+    <p class="eyebrow" data-in>Problem definition</p>
+    <h2 data-in>Three sectors, three questions</h2>
+    <div class="sectorcards">
+      <article class="scard" data-in>
+        <i class="bar" style="background:var(--s-purple)"></i>
+        <div class="sid"><span style="color:var(--s-purple)">Sector 1</span><b class="num">Q1</b></div>
+        <h3>How much does the starting grid decide the result?</h3>
+        <p><b>Expect:</b> a strong link that has grown stronger since 2010.</p>
+        <span class="big" aria-hidden="true">S1</span>
+      </article>
+      <article class="scard" data-in>
+        <i class="bar" style="background:var(--s-green)"></i>
+        <div class="sid"><span style="color:var(--s-green)">Sector 2</span><b class="num">Q2</b></div>
+        <h3>Does one team own each era?</h3>
+        <p><b>Expect:</b> clear dynasties rather than an open fight.</p>
+        <span class="big" aria-hidden="true">S2</span>
+      </article>
+      <article class="scard" data-in>
+        <i class="bar" style="background:var(--s-yellow)"></i>
+        <div class="sid"><span style="color:var(--s-yellow)">Sector 3</span><b class="num">Q3</b></div>
+        <h3>Have the cars stopped breaking down?</h3>
+        <p><b>Expect:</b> far fewer mechanical retirements today.</p>
+        <span class="big" aria-hidden="true">S3</span>
+      </article>
+    </div>
+  </section>
+
+  <!-- 4 EDA: four beats, one click each -->
+  <section class="slide has-beats" id="sEDA" data-name="EDA results">
+    <div class="beatbar" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
+    <div class="beat" id="s4" data-name="EDA · Grid vs result" data-notes="Sector one. From pole, a driver finished on the podium 80% of the time since 2010. From fifth it drops to 20%, and after seventh it is almost zero. Grid and finishing position have a correlation of 0.78, and only 4 of 305 races were won from outside the top ten.">
+      <p class="eyebrow" data-in>EDA · Sector 1 · Grid vs result</p>
+      <h2 data-in>Start on pole, finish on the podium 4 times in 5</h2>
+      <div class="pacewrap">
+        <div class="chart" data-in>
+          <div class="bars" id="bars">
+            <div class="gl"><span>20%</span></div>
+            <div class="gl"><span>40%</span></div>
+            <div class="gl"><span>60%</span></div>
+            <div class="gl"><span>80%</span></div>
+          </div>
+          <div class="xlab" id="xlab"></div>
+          <p class="cap">Share of starts that ended on the podium, by grid slot, 2010–2024. Red marks the first three slots.</p>
+        </div>
+        <div class="stats">
+          <div class="stat" data-in><span class="num" data-count="0.78" data-dec="2">0.78</span><p>correlation between grid slot and finishing position</p></div>
+          <div class="stat" data-in><span class="num">4<span style="color:var(--dim)">/305</span></span><p>races won from outside the top ten</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="beat" id="s4h" data-name="EDA · Heatmap" data-notes="Here is the same idea as a picture. Each row is a starting slot and each column is a finishing position. The bright diagonal means most drivers finish close to where they started. 67% of finishers ended within three places of their grid slot. Hover any cell for the exact number.">
+      <p class="eyebrow" data-in>EDA · Sector 1 · Where each grid slot finishes</p>
+      <h2 data-in>Drivers finish close to where they start</h2>
+      <div class="hmwrap">
+        <div data-in style="display:flex;flex-direction:column;gap:10px">
+          <span class="axis">Finishing position →</span>
+          <div style="display:flex;gap:14px;align-items:center">
+            <span class="axis" style="writing-mode:vertical-rl;transform:rotate(180deg)">Grid slot →</span>
+            <div class="hm" id="hm"></div>
+          </div>
+        </div>
+        <div class="hmside">
+          <div class="stat" data-in><span class="num">56%</span><p>of pole sitters who finished went on to win</p></div>
+          <div class="stat" data-in><span class="num">67%</span><p>of finishers ended within three places of their grid slot</p></div>
+          <div class="stat" data-in><span class="num">1.5%</span><p>of finishers starting 11th or lower made the podium</p></div>
+          <div class="ramp" data-in><div class="g"></div><div class="t"><span>0%</span><span>share of row · 4,954 finishers, 2010–24</span><span>56%</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="beat" id="s5" data-name="EDA · Reliability" data-notes="Sector three. About half of the cars that started did not finish, every decade until the 1990s. In the 2020s it is only 14%. Mechanical failures alone went from 38% of starters to about 6%. Since 2010, about half of retirements are still mechanical and 41% are crashes.">
+      <p class="eyebrow" data-in>EDA · Sector 3 · Reliability</p>
+      <h2 data-in>Half the field used to break. Now it’s one in seven.</h2>
+      <div class="relwrap">
+        <div class="rel" data-in>
+          <svg viewBox="0 0 1100 470" role="img" aria-label="Line chart: DNF rate among starters fell from 49% in the 1950s to 14% in the 2020s; mechanical failures fell from 38% to 6%.">
+            <g font-family="JetBrains Mono, monospace" font-size="20" fill="#5C5F68">
+              <line x1="70" x2="1080" y1="400" y2="400" stroke="#2A2B33" stroke-width="2"/>
+              <line x1="70" x2="1080" y1="300" y2="300" stroke="#2A2B33" stroke-dasharray="4 6"/>
+              <line x1="70" x2="1080" y1="200" y2="200" stroke="#2A2B33" stroke-dasharray="4 6"/>
+              <line x1="70" x2="1080" y1="100" y2="100" stroke="#2A2B33" stroke-dasharray="4 6"/>
+              <text x="56" y="406" text-anchor="end">0%</text>
+              <text x="56" y="306" text-anchor="end">20%</text>
+              <text x="56" y="206" text-anchor="end">40%</text>
+              <text x="56" y="106" text-anchor="end">60%</text>
+            </g>
+            <g font-family="JetBrains Mono, monospace" font-size="20" fill="#8F929B" text-anchor="middle" id="xticks"></g>
+            <path id="areaAll" fill="url(#rg)" opacity=".35"/>
+            <defs><linearGradient id="rg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#FF2B17" stop-opacity=".7"/><stop offset="1" stop-color="#FF2B17" stop-opacity="0"/></linearGradient></defs>
+            <path id="lineAll" fill="none" stroke="#FF2B17" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>
+            <path id="lineMech" fill="none" stroke="#EEEAE2" stroke-width="4" stroke-dasharray="2 10" stroke-linecap="round"/>
+            <g id="dots"></g>
+          </svg>
+          <div class="legend"><span><i style="background:var(--red)"></i>Did not finish, all causes</span><span><i style="background:var(--chalk);height:4px"></i>Mechanical failure only</span></div>
+        </div>
+        <div class="stats">
+          <div class="stat" data-in><span class="num">49<span style="color:var(--dim)">→</span>14%</span><p>DNF rate among starters, 1950s to 2020s</p></div>
+          <div class="split" data-in>
+            <span class="h">Why cars retired, 2010–2024</span>
+            <div class="bar"><i style="width:51%;background:var(--chalk)" data-tip="Mechanical · 578 retirements · 51%"></i><i style="width:41%;background:var(--red)" data-tip="Crash or collision · 467 retirements · 41%"></i><i style="width:8%;background:var(--dim)" data-tip="Other · 90 retirements · 8%"></i></div>
+            <div class="k">
+              <span><em style="--sw:var(--chalk)">Mechanical</em><b>51%</b></span>
+              <span><em style="--sw:var(--red)">Crash</em><b>41%</b></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="src">Starters only: did-not-qualify, withdrawn and excluded entries removed · 2020s = 2020–2024</p>
+    </div>
+
+    <div class="beat" id="s6" data-name="EDA · Dominance" data-notes="Sector two. Every era has one team on top, and the share keeps growing. Mercedes won 102 of 138 races from 2014 to 2020, that is 74%. Red Bull won 21 of 22 in 2023. And the top drivers sat in those cars: Hamilton, Schumacher and Verstappen all won most with the dominant team of their time.">
+      <p class="eyebrow" data-in>EDA · Sector 2 · Constructor dominance</p>
+      <h2 data-in>Every era has an owner</h2>
+      <div class="eras" id="eras" data-in></div>
+      <div class="drivers" data-in><span class="k">Most race wins</span><span><b>Hamilton</b>105 · Mercedes</span><span><b>Schumacher</b>91 · Ferrari</span><span><b>Verstappen</b>63 · Red Bull</span><span><b>Vettel</b>53 · Red Bull</span></div>
+      <p class="src">Share of race wins taken by the most successful constructor in each period · 1950–2024</p>
+    </div>
+  </section>
+
+  <!-- 5 DASHBOARD -->
+  <section class="slide" id="s7" data-name="Dashboard" data-notes="Now the live demo. Open the dashboard and change the seasons to 2014 to 2020, pick Mercedes and Red Bull, and show that every number and chart updates. Then open the Drivers tab, play one Lights Out start, and double-click Max to ask him a question. If the demo does not work, use this screenshot.">
+    <p class="eyebrow" data-in>Dashboard demo · Streamlit</p>
+    <h2 data-in>Filter any era, any team, any circuit</h2>
+    <div class="pitwrap">
+      <div class="laptop" data-in>
+        <div class="lid">
+          <img src="dashboard.jpg" alt="The Lights Out Streamlit dashboard: filter bar, the answer Mostly yes, four stat cards and the Max assistant">
+          <span class="pin" style="left:50%;top:12%">1</span>
+          <span class="pin" style="left:30%;top:66%">2</span>
+          <span class="pin" style="left:93%;top:80%">3</span>
+        </div>
+        <div class="base"></div>
+      </div>
+      <div class="radio">
+        <div class="radiocard" data-in>
+          <div class="who"><span style="width:12px;height:12px;border-radius:50%;background:var(--red);display:inline-block"></span>Team radio</div>
+          <div class="wave" id="wave" aria-hidden="true"></div>
+          <q>Box, box. Going to live demo.</q>
+        </div>
+        <ol class="features" data-in>
+          <li><b>1</b><span>Filter bar<small>seasons slider, teams, circuit</small></span></li>
+          <li><b>2</b><span>Live answer and stat cards<small>every number follows the filters</small></span></li>
+          <li><b>3</b><span>Max, the AI assistant<small>answers from the data, drag him anywhere</small></span></li>
+          <li><b class="plain">+</b><span>7 tabs of animated charts<small>plus a podium predictor and mini games</small></span></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 INSIGHTS -->
+  <section class="slide" id="s8" data-name="Insights" data-notes="My three findings, as a podium. P1: Saturday decides Sunday. 51% of races since 2010 were won from pole and 77% from the front row. P2: cars stopped breaking. Retirements fell from one in two starters to one in seven. P3: dynasties got stronger. Mercedes won 74% of races from 2014 to 2020.">
+    <canvas id="sparks" width="1920" height="1080" aria-hidden="true"></canvas>
+    <p class="eyebrow" data-in>Final insights</p>
+    <h2 data-in>What the data says</h2>
+    <div class="podium">
+      <div class="step p2">
+        <div class="txt" data-in><h3>Cars stopped breaking</h3><p>Retirements fell from one in two starters to one in seven.</p></div>
+        <div class="block"><span class="p">P2</span><span class="n">14%<small>DNF, 2020s</small></span></div>
+      </div>
+      <div class="step p1">
+        <div class="txt" data-in><h3>Saturday decides Sunday</h3><p>51% of races since 2010 were won from pole, 77% from the front row.</p></div>
+        <div class="block"><span class="p">P1</span><span class="n">77%<small>front-row wins</small></span></div>
+      </div>
+      <div class="step p3">
+        <div class="txt" data-in><h3>Dynasties got stronger</h3><p>Mercedes won 102 of 138 races from 2014 to 2020.</p></div>
+        <div class="block"><span class="p">P3</span><span class="n">74%<small>win share</small></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 CONCLUSION -->
+  <section class="slide" id="s9" data-name="Conclusion" data-notes="So, is the race decided on Saturday? Mostly, yes. (click) Limitations: the points system changed many times, so I used positions and wins. Status labels are not the same in every decade, and there is no weather, tyre or strategy data. Next, I want to add the pit stop and lap time tables, compare street circuits with normal tracks, and make the podium model better. (click) Thank you, any questions?">
+    <canvas id="flag" width="900" height="1080" aria-hidden="true"></canvas>
+    <p class="eyebrow" data-in>Conclusion · Chequered flag</p>
+    <h2 class="answer" data-in>Mostly, yes<span>.</span></h2>
+    <p class="lede" data-in>Since 2010, 51% of races were won from pole and 77% from the front row. Sunday mostly moves drivers by a few places.</p>
+    <div class="listcard" data-step="1">
+      <h3>Limitations</h3>
+      <ul>
+        <li><b>01</b><span>Points systems changed, so I compared positions and wins.</span></li>
+        <li><b>02</b><span>Retirement labels differ across decades.</span></li>
+        <li><b>03</b><span>No weather, tyre or strategy data.</span></li>
+      </ul>
+    </div>
+    <div class="listcard" data-step="1">
+      <h3>Next lap</h3>
+      <ul>
+        <li><b>01</b><span>Add the pit stop and lap time tables.</span></li>
+        <li><b>02</b><span>Compare street circuits with permanent tracks.</span></li>
+        <li><b>03</b><span>Make the podium model better with more features.</span></li>
+      </ul>
+    </div>
+    <div class="questions" data-step="2">Questions<span>?</span></div>
+  </section>
+
+  <div class="hud top" aria-hidden="false">
+    <span class="lap"><span class="tag">F1 EDA</span>Lap <b id="lapNo">1</b>/<span id="lapTot">7</span></span>
+    <div class="hudr">
+      <span class="clock" id="clock" title="Talk timer: starts on your first click, target 7:00"><i class="dot"></i>Race time <b id="clockT">0:00</b><span style="color:var(--dim)">/ 7:00</span></span>
+      <span id="secName">Lights out</span>
+    </div>
+  </div>
+  <div class="hud bottom">
+    <div class="sectors" id="sectors" aria-hidden="true"></div>
+    <span>← → · M laps · N notes · F fullscreen</span>
+    <div class="nav"><button id="menuBtn" aria-label="Open slide list">Laps</button><button id="prev" aria-label="Previous">‹</button><button id="next" aria-label="Next">›</button></div>
+  </div>
+
+  <div class="lapmenu" id="lapmenu" hidden><h3>Lap chart</h3><div class="lapgrid" id="lapgrid"></div></div>
+  <div id="tip" hidden></div>
+  <div id="notes" hidden><span class="k">Speaker notes</span><span id="notesText"></span></div>
+  <div id="sweep" aria-hidden="true"></div>
+  <div class="vignette"></div><div class="grain"></div><div class="scan"></div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(function(){
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const G = window.gsap;
+const stage = document.getElementById('stage');
+const vp = document.getElementById('viewport');
+function fit(){
+  const w = vp.clientWidth, h = vp.clientHeight;
+  const s = Math.min(w/1920, h/1080);
+  stage.style.left = '50%'; stage.style.top = '50%';
+  stage.style.transform = 'translate(-50%,-50%) scale('+s+')';
+  stage.style.transformOrigin = '50% 50%';
+}
+window.addEventListener('resize', fit); fit();
+
+/* ---------- data-driven pieces ---------- */
+const podium = [80,69,51,35,20,14,8,3,4,4];
+const bars = document.getElementById('bars'), xlab = document.getElementById('xlab');
+podium.forEach((v,i)=>{
+  const c = document.createElement('div'); c.className = 'col' + (i<3?' hot':'');
+  c.dataset.tip = 'Start P'+(i+1)+' → podium '+v+'% of the time';
+  c.innerHTML = '<span class="v">'+v+'%</span><div class="b" style="height:'+(v/80*100*0.9)+'%"></div>';
+  bars.appendChild(c);
+  const l = document.createElement('span'); l.textContent = 'P'+(i+1); if(i<3) l.className='hot'; xlab.appendChild(l);
+});
+// gridlines scale: 80% -> 90% height
+bars.querySelectorAll('.gl').forEach((g,i)=>{ g.style.bottom = ((i+1)*20/80*90)+'%'; });
+
+const decades = ['1950s','1960s','1970s','1980s','1990s','2000s','2010s','2020s'];
+const dnf = [48.8,49.0,47.1,55.3,49.7,31.9,19.4,14.3];
+const mech = [38.2,40.6,32.3,38.4,30.3,18.6,10.4,6.3];
+const X = i => 110 + i*(960/7), Y = v => 400 - v*5;
+const pts = a => a.map((v,i)=>[X(i),Y(v)]);
+const toPath = p => p.map((q,i)=>(i?'L':'M')+q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' ');
+const pa = pts(dnf), pm = pts(mech);
+document.getElementById('lineAll').setAttribute('d', toPath(pa));
+document.getElementById('lineMech').setAttribute('d', toPath(pm));
+document.getElementById('areaAll').setAttribute('d', toPath(pa)+' L'+X(7)+' 400 L'+X(0)+' 400 Z');
+const NS='http://www.w3.org/2000/svg';
+const xt = document.getElementById('xticks'), dots = document.getElementById('dots');
+decades.forEach((d,i)=>{
+  const t = document.createElementNS(NS,'text'); t.setAttribute('x',X(i)); t.setAttribute('y',440); t.textContent=d; xt.appendChild(t);
+  const c = document.createElementNS(NS,'circle'); c.setAttribute('cx',pa[i][0]); c.setAttribute('cy',pa[i][1]); c.setAttribute('r', i===7?12:7);
+  c.setAttribute('fill', i===7?'#FF2B17':'#0A0A0C'); c.setAttribute('stroke','#FF2B17'); c.setAttribute('stroke-width','4'); dots.appendChild(c);
+  if(i===0||i===3||i===7){ const lb=document.createElementNS(NS,'text'); lb.setAttribute('x',pa[i][0]); lb.setAttribute('y',pa[i][1]-24); lb.setAttribute('text-anchor','middle');
+    lb.setAttribute('font-family','JetBrains Mono, monospace'); lb.setAttribute('font-size','24'); lb.setAttribute('font-weight','700'); lb.setAttribute('fill','#EEEAE2'); lb.textContent=Math.round(dnf[i])+'%'; dots.appendChild(lb); }
+});
+
+const eras = [
+  ['1950–59','Ferrari',30,87],['1960–69','Lotus-Climax',22,100],['1970–79','Ferrari',37,144],
+  ['1980–89','McLaren',56,156],['1990–99','Williams',61,162],['2000–09','Ferrari',85,174],
+  ['2010–13','Red Bull',41,77],['2014–20','Mercedes',102,138],['2021–24','Red Bull',58,90]];
+const erasEl = document.getElementById('eras');
+eras.forEach(e=>{
+  const pct = Math.round(e[2]/e[3]*100);
+  const r = document.createElement('div'); r.className='era'+(pct>=60?' peak':'');
+  r.dataset.tip = e[0]+' · '+e[1]+' won '+e[2]+' of '+e[3]+' races';
+  r.innerHTML = '<span class="yr">'+e[0]+'</span><span class="tm">'+e[1]+'</span><div class="track"><div class="fill" style="width:'+pct+'%"></div></div><span class="pc">'+pct+'%<small>'+e[2]+' of '+e[3]+' wins</small></span>';
+  erasEl.appendChild(r);
+});
+
+const wave = document.getElementById('wave');
+for(let i=0;i<40;i++){ const b=document.createElement('i'); wave.appendChild(b); }
+
+/* ---------- heatmap: grid slot (rows) x finishing position (cols), % of row, 2010–2024 finishers ---------- */
+const HM = [[56.1,20.9,10.8,5.8,1.1,1.4,1.1,1.1,1.1,0,0,0,0,0.4,0.4,0,0,0,0,0],[28.6,31.9,15.2,7.2,4.7,2.2,2.9,2.2,1.4,0.4,1.4,0.4,0.4,0.4,0.4,0,0,0,0,0.4],[11.8,19.1,26.1,14.7,10.7,5.5,4.4,1.8,1.8,2.2,0,0.4,0,0.7,0,0,0.7,0,0,0],[4.1,16.5,19.9,22.6,14.3,8.6,6.4,1.9,1.5,1.5,0.4,0,0.4,0.4,0.8,0,0.4,0,0.4,0],[2.3,8.2,12.8,20.2,16.7,11.3,5.1,6.6,3.9,4.7,2.3,1.2,0,1.9,0.8,1.2,0.8,0,0,0],[2.6,4.5,8.6,13.1,16.4,18.7,9.7,6.7,5.6,3,1.9,2.2,2.2,1.5,1.9,1.1,0,0.4,0,0],[1.1,3.4,4.5,2.3,12.5,18.6,17,9.5,8,4.5,4.5,5.3,3.8,1.1,2.3,1.1,0.4,0,0,0],[0.8,0.8,2,8.1,10.2,9.3,14.2,11.4,11.8,8.1,7.3,4.1,5.3,1.2,3.7,0.8,0.8,0,0,0],[0.4,2.4,2.4,8,6.8,8.8,13.3,12.4,10.8,8.8,5.6,5.2,6,3.2,4,1.2,0.4,0,0,0],[1.6,1.6,2,1.6,4.8,7.2,11.6,9.6,16.1,12.4,8,6.4,5.2,4.8,1.6,2,2,0.4,0.4,0.4],[0.4,1.2,1.2,3.2,6.9,5.6,8.5,11.3,11.3,6.9,13.3,6,7.3,6,4.4,2.8,2.8,0.8,0,0],[0,0.4,1.7,1.7,3.3,6.3,5,11.7,8.4,9.2,15.5,9.6,11.3,6.3,3.8,3.8,0.8,0.8,0.4,0],[0,0,1.7,0.4,0.4,5.5,5.5,8.4,10.1,13.9,8.9,11,8,8.4,6.8,6.3,3,1.3,0.4,0],[0.8,0.4,0.4,0.8,0.4,1.6,4.1,6.6,4.1,12.3,9.5,12.3,11.1,10.7,7.8,10.3,4.1,1.2,1.2,0],[0,0.4,1.2,2.5,1.7,2.5,2.1,5.4,4.1,9.9,8.3,9.5,15.3,11.6,9.9,5.8,4.1,4.1,1.7,0],[0,0,0.4,1.7,0.9,1.7,2.2,3.5,6.6,7,10.9,13.1,7.9,10.9,10.5,7.9,7,3.9,3.5,0.4],[0.4,0,0.4,0,1.3,1.3,1.7,3.8,5,4.2,10.5,12.2,11.3,10.5,9.2,10.1,9.2,4.2,2.9,1.7],[0,0.4,0.4,0.4,0.4,0.8,2.5,2.5,3,5.5,4.6,10.1,6.8,10.1,13.9,11,13.1,7.6,5.5,1.3],[0,0,0.9,0.9,2.6,0.9,0.4,2.6,2.2,3.1,4.4,6.6,7.9,10.5,12.2,13.5,13.1,8.7,7.4,2.2],[0,1.1,1.1,2.1,0,1.1,0.5,1.1,3.7,2.7,3.2,7,9.1,11.8,9.6,12.3,9.1,13.4,7,4.3]];
+const ramp = [[0,[22,23,27]],[.12,[90,19,9]],[.3,[196,28,11]],[.55,[255,106,85]],[1,[255,227,220]]];
+function heat(v){ const t = Math.min(1, Math.sqrt(v/56.1)); for(let k=1;k<ramp.length;k++){ if(t<=ramp[k][0]){ const a=ramp[k-1], b=ramp[k], u=(t-a[0])/(b[0]-a[0]); return 'rgb('+a[1].map((x,j)=>Math.round(x+(b[1][j]-x)*u)).join(',')+')'; } } return 'rgb(255,227,220)'; }
+const hm = document.getElementById('hm');
+HM.forEach((row,r)=>{
+  const rl=document.createElement('span'); rl.className='rl'; rl.textContent='P'+(r+1); hm.appendChild(rl);
+  row.forEach((v,c)=>{ const d=document.createElement('i'); d.className='c'; d.style.background=heat(v); d.dataset.r=r; d.dataset.c=c;
+    d.dataset.tip='Start P'+(r+1)+' → finish P'+(c+1)+' · '+v+'%'; hm.appendChild(d); });
+});
+hm.appendChild(document.createElement('span'));
+for(let c=0;c<20;c++){ const l=document.createElement('span'); l.className='cl'; l.textContent=(c%2===0||c===19)?(c+1):''; hm.appendChild(l); }
+
+/* ---------- tooltip ---------- */
+const tip = document.getElementById('tip');
+function stageScale(){ return stage.getBoundingClientRect().width/1920; }
+stage.addEventListener('mousemove',e=>{
+  const t = e.target.closest('[data-tip]');
+  if(!t || !t.closest('.slide.active') || (t.closest('.beat') && !t.closest('.beat.on'))){ tip.hidden = true; return; }
+  const b = stage.getBoundingClientRect(), s = stageScale();
+  let x = (e.clientX-b.left)/s + 22, y = (e.clientY-b.top)/s + 22;
+  tip.textContent = t.dataset.tip; tip.hidden = false;
+  if(x + tip.offsetWidth > 1890) x -= tip.offsetWidth + 44;
+  tip.style.left = x+'px'; tip.style.top = y+'px';
+  if(t.classList.contains('c')){ hm.querySelectorAll('.c').forEach(c=>{ c.style.opacity = (c.dataset.r===t.dataset.r||c.dataset.c===t.dataset.c)?1:.35; }); }
+});
+stage.addEventListener('mouseleave',()=>{ tip.hidden = true; });
+hm.addEventListener('mouseleave',()=>{ hm.querySelectorAll('.c').forEach(c=>c.style.opacity=1); });
+
+/* ---------- race clock ---------- */
+let t0 = null; const clockEl = document.getElementById('clock'), clockT = document.getElementById('clockT');
+function startClock(){ if(t0===null){ t0 = Date.now(); clockEl.classList.add('run'); } }
+setInterval(()=>{ if(t0===null) return; const s = Math.floor((Date.now()-t0)/1000);
+  clockT.textContent = Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+  clockEl.classList.toggle('warn', s>=360 && s<420); clockEl.classList.toggle('over', s>=420); }, 250);
+
+/* ---------- sparks (insights) ---------- */
+const sp = document.getElementById('sparks'), spx = sp.getContext('2d'); let parts = [];
+function burst(x,y){ if(reduce) return; for(let i=0;i<140;i++){ const a = -Math.PI/2 + (Math.random()-.5)*1.6, v = 6+Math.random()*14;
+  parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,l:1,c:Math.random()<.6?'255,43,23':(Math.random()<.5?'255,210,26':'238,234,226')}); }
+  if(parts.length===140) sparkLoop(); }
+function sparkLoop(){ spx.clearRect(0,0,1920,1080);
+  parts.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=.35; p.vx*=.985; p.l-=.012;
+    spx.strokeStyle='rgba('+p.c+','+Math.max(0,p.l)+')'; spx.lineWidth=2.5; spx.beginPath(); spx.moveTo(p.x,p.y); spx.lineTo(p.x-p.vx*2,p.y-p.vy*2); spx.stroke(); });
+  parts = parts.filter(p=>p.l>0 && p.y<1100);
+  if(parts.length) requestAnimationFrame(sparkLoop); else spx.clearRect(0,0,1920,1080); }
+
+/* ---------- ambient: speed streaks ---------- */
+const cv = document.getElementById('streaks'), ctx = cv.getContext('2d');
+const streaks = Array.from({length:46},()=>({x:Math.random()*1920,y:Math.random()*1080,l:120+Math.random()*520,v:6+Math.random()*22,a:.05+Math.random()*.22,r:Math.random()<.22}));
+let boost = 0;
+function drawStreaks(){
+  ctx.clearRect(0,0,1920,1080);
+  streaks.forEach(s=>{
+    const g = ctx.createLinearGradient(s.x,0,s.x+s.l,0);
+    const col = s.r ? '255,43,23' : '238,234,226';
+    g.addColorStop(0,'rgba('+col+','+(s.a*(1+boost))+')'); g.addColorStop(1,'rgba('+col+',0)');
+    ctx.fillStyle = g; ctx.fillRect(s.x, s.y, s.l, s.r?2:1);
+    if(!reduce){ s.x -= s.v*(1+boost*6); if(s.x + s.l < 0){ s.x = 1920 + Math.random()*200; s.y = Math.random()*1080; } }
+  });
+}
+function loop(){ drawStreaks(); boost *= .94; requestAnimationFrame(loop); }
+if(reduce) drawStreaks(); else loop();
+
+/* ---------- chequered flag ---------- */
+const fc = document.getElementById('flag'), fx = fc.getContext('2d'); let ft = 0, flagOn = false;
+function drawFlag(){
+  fx.clearRect(0,0,900,1080);
+  const cols=12, rows=16, cw=64, ch=64, ox=120, oy=60;
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    const w = (x,y)=> Math.sin(x*0.012 + ft*2.2) * 26 * (x/900) + Math.cos(y*0.01 + ft*1.6)*8*(x/900);
+    const x0=ox+c*cw, y0=oy+r*ch, x1=x0+cw, y1=y0+ch;
+    const p=[[x0,y0+w(x0,y0)],[x1,y0+w(x1,y0)],[x1,y1+w(x1,y1)],[x0,y1+w(x0,y1)]];
+    const shade = 0.75 + 0.25*Math.cos(x0*0.012 + ft*2.2);
+    fx.fillStyle = (r+c)%2 ? 'rgba(238,234,226,'+shade+')' : 'rgba(20,20,24,'+shade+')';
+    fx.beginPath(); fx.moveTo(p[0][0],p[0][1]); p.slice(1).forEach(q=>fx.lineTo(q[0],q[1])); fx.closePath(); fx.fill();
+  }
+}
+function flagLoop(){ if(!flagOn) return; ft += .016; drawFlag(); requestAnimationFrame(flagLoop); }
+drawFlag();
+
+/* ---------- counters ---------- */
+function runCounters(scope){
+  if(!G || reduce) return;
+  const els = scope.matches && scope.matches('[data-count]') ? [scope] : [];
+  els.concat(Array.from(scope.querySelectorAll('[data-count]'))).forEach(el=>{
+    const end = parseFloat(el.dataset.count), dec = parseInt(el.dataset.dec||'0',10), o={v:0};
+    G.to(o,{v:end,duration:1.4,ease:'power3.out',onUpdate:()=>{ el.textContent = dec ? o.v.toFixed(dec) : Math.round(o.v).toLocaleString('en-US'); }});
+  });
+}
+
+/* ---------- entrances: a slide, or one beat inside the EDA slide ---------- */
+const slides = Array.from(document.querySelectorAll('.slide'));
+let cur = 0, step = 0, busy = false, lightsTimer = [];
+function enter(el){
+  if(!G || reduce) return;
+  const items = Array.from(el.querySelectorAll('[data-in]')).filter(x => !x.closest('[data-step]') && (x.closest('.beat') ? el.classList.contains('beat') : true));
+  G.fromTo(items,{x:90,opacity:0,filter:'blur(14px)'},{x:0,opacity:1,duration:.9,ease:'expo.out',stagger:.09,clearProps:'filter,opacity,transform'});
+  if(el.classList.contains('beat') || !el.classList.contains('has-beats')) runCounters(el.classList.contains('beat') ? el : el.querySelector('.bignum') || el);
+  const id = el.id;
+  if(id==='s1') startLights();
+  if(id==='s3') G.fromTo(el.querySelectorAll('.scard .bar'),{scaleX:0,transformOrigin:'left'},{scaleX:1,duration:1.1,ease:'power2.inOut',stagger:.25,delay:.3});
+  if(id==='s4') G.fromTo(el.querySelectorAll('.col .b'),{scaleY:0},{scaleY:1,duration:1.1,ease:'expo.out',stagger:.06,delay:.25});
+  if(id==='s4h') G.fromTo(el.querySelectorAll('.hm .c'),{opacity:0,scale:.3},{opacity:1,scale:1,duration:.5,ease:'back.out(2)',stagger:{grid:[20,20],from:0,amount:1.1},delay:.25});
+  if(id==='s5'){
+    ['lineAll','lineMech'].forEach(k=>{ const p=document.getElementById(k), L=p.getTotalLength();
+      if(k==='lineAll'){ G.fromTo(p,{strokeDasharray:L,strokeDashoffset:L},{strokeDashoffset:0,duration:1.8,ease:'power2.inOut',delay:.3}); }
+      else G.fromTo(p,{opacity:0},{opacity:1,duration:.8,delay:1.4}); });
+    G.fromTo('#areaAll',{opacity:0},{opacity:.35,duration:1,delay:1.4});
+    G.fromTo('#dots > *',{opacity:0,scale:0,transformOrigin:'center'},{opacity:1,scale:1,duration:.4,stagger:.12,delay:.5});
+    G.fromTo(el.querySelectorAll('.split .bar i'),{scaleX:0},{scaleX:1,duration:.9,ease:'expo.out',stagger:.15,delay:1});
+  }
+  if(id==='s6') G.fromTo(el.querySelectorAll('.era .fill'),{scaleX:0},{scaleX:1,duration:1,ease:'expo.out',stagger:.08,delay:.3});
+  if(id==='s7') animateWave();
+  if(id==='s8'){ G.fromTo(el.querySelectorAll('.block'),{scaleY:0},{scaleY:1,duration:1,ease:'back.out(1.4)',stagger:{each:.22,from:'center'},delay:.2});
+    setTimeout(()=>{ if(slides[cur]===el){ burst(960,640); setTimeout(()=>{ burst(420,760); burst(1500,800); },350); } },700); }
+}
+function animateWave(){
+  if(!G || reduce) return;
+  wave.querySelectorAll('i').forEach((b,i)=>{ G.fromTo(b,{height:'15%'},{height:()=> (25+Math.random()*75)+'%',duration:.18+Math.random()*.2,repeat:9,yoyo:true,ease:'sine.inOut',delay:i*.015}); });
+}
+
+/* ---------- start lights ---------- */
+function startLights(){
+  const pods = slides[0].querySelectorAll('.pod'), title = document.getElementById('title'), flash = slides[0].querySelector('.flash');
+  lightsTimer.forEach(clearTimeout); lightsTimer = [];
+  pods.forEach(p=>p.classList.remove('on'));
+  if(!G || reduce){ return; }
+  G.set(title.querySelectorAll('.w'),{opacity:.16,y:24});
+  pods.forEach((p,i)=> lightsTimer.push(setTimeout(()=>p.classList.add('on'), 600 + i*850)));
+  const outAt = 600 + 4*850 + 900 + Math.random()*600;
+  lightsTimer.push(setTimeout(()=>{
+    pods.forEach(p=>p.classList.remove('on'));
+    G.fromTo(flash,{opacity:.35},{opacity:0,duration:.6,ease:'power2.out'});
+    boost = 3;
+    G.to(title.querySelectorAll('.w'),{opacity:1,y:0,duration:.7,ease:'expo.out',stagger:.07});
+    G.fromTo(slides[0].querySelector('.ghost'),{x:200},{x:0,duration:1.6,ease:'expo.out'});
+  }, outAt));
+}
+
+/* ---------- steps inside a slide: EDA beats, or builds marked data-step ---------- */
+const beatsOf = el => Array.from(el.querySelectorAll('.beat'));
+function lastStep(el){
+  const b = beatsOf(el); if(b.length) return b.length-1;
+  let m = 0; el.querySelectorAll('[data-step]').forEach(x=>{ m = Math.max(m, +x.dataset.step); }); return m;
+}
+function showStep(el, n, animate, dir){
+  const b = beatsOf(el);
+  if(b.length){
+    const old = b.find(x=>x.classList.contains('on'));
+    const swap = ()=>{ b.forEach((x,i)=>x.classList.toggle('on', i===n)); el.querySelectorAll('.beatbar i').forEach((x,i)=>x.classList.toggle('on', i<=n)); if(animate) enter(b[n]); };
+    if(animate && old && old!==b[n] && G && !reduce){
+      busy = true; boost = 1.5;
+      G.to(old,{x:-100*(dir||1),opacity:0,duration:.3,ease:'power2.in',onComplete:()=>{ G.set(old,{clearProps:'x,opacity'}); swap(); busy = false; }});
+    } else swap();
+  } else {
+    el.querySelectorAll('[data-step]').forEach(x=>{
+      const s = +x.dataset.step, show = s<=n;
+      x.classList.toggle('shown', show);
+      if(show && animate && s===n && G && !reduce){
+        G.fromTo(x,{y:50,opacity:0,filter:'blur(10px)'},{y:0,opacity:1,duration:.8,ease:'expo.out',clearProps:'filter,opacity,transform'});
+        runCounters(x);
+        if(x.classList.contains('merge')) G.fromTo(x.querySelectorAll('.chip'),{x:-60,opacity:0},{x:0,opacity:1,duration:.6,ease:'back.out(1.6)',stagger:.08});
+      }
+    });
+  }
+  step = n; hud();
+}
+
+/* ---------- navigation ---------- */
+const sectorsEl = document.getElementById('sectors');
+slides.forEach(()=>sectorsEl.appendChild(document.createElement('i')));
+document.getElementById('lapTot').textContent = slides.length;
+function current(){ const b = beatsOf(slides[cur]); return b.length ? b[step] : slides[cur]; }
+function hud(){
+  document.getElementById('lapNo').textContent = cur+1;
+  document.getElementById('secName').textContent = current().dataset.name || slides[cur].dataset.name;
+  sectorsEl.querySelectorAll('i').forEach((s,i)=>{ s.className = i<cur?'done':(i===cur?'now':''); });
+  document.getElementById('notesText').textContent = current().dataset.notes || slides[cur].dataset.notes || '';
+}
+function go(n, land){
+  if(busy || n===cur || n<0 || n>=slides.length) return;
+  startClock(); tip.hidden = true;
+  const from = slides[cur], to = slides[n], dir = n>cur ? 1 : -1;
+  const target = land==='last' ? lastStep(to) : 0;
+  if(from.id==='s9'){ flagOn=false; }
+  if(!G || reduce){ from.classList.remove('active'); to.classList.add('active'); cur=n; showStep(to, target, false); if(to.id==='s9'){ drawFlag(); } return; }
+  busy = true; boost = 2.5;
+  const sw = document.getElementById('sweep');
+  G.fromTo(sw,{x: dir>0 ? -1600 : 2200, skewX:-14},{x: dir>0 ? 2200 : -1600, duration:.75, ease:'power2.in'});
+  G.to(from,{x:-140*dir,opacity:0,filter:'blur(10px)',duration:.4,ease:'power2.in',onComplete:()=>{
+    from.classList.remove('active'); G.set(from,{clearProps:'x,opacity,filter'});
+    to.classList.add('active'); cur = n;
+    showStep(to, target, false); enter(to);
+    const b = beatsOf(to); if(b.length) enter(b[target]);
+    if(to.id==='s9'){ flagOn=true; flagLoop(); }
+    busy = false;
+  }});
+}
+function next(){ if(busy) return; startClock(); if(step < lastStep(slides[cur])) showStep(slides[cur], step+1, true, 1); else go(cur+1); }
+function prev(){ if(busy) return; if(step > 0) showStep(slides[cur], step-1, true, -1); else go(cur-1, 'last'); }
+document.getElementById('next').addEventListener('click',next);
+document.getElementById('prev').addEventListener('click',prev);
+document.addEventListener('keydown',e=>{
+  if(e.target.closest && e.target.closest('button') && (e.key==='Enter'||e.key===' ')) return;
+  if(['ArrowRight','PageDown',' ','Enter'].includes(e.key)){ e.preventDefault(); next(); }
+  else if(['ArrowLeft','PageUp','Backspace'].includes(e.key)){ e.preventDefault(); prev(); }
+  else if(e.key==='Home') go(0);
+  else if(e.key==='End') go(slides.length-1);
+  else if(e.key==='m'||e.key==='M'){ toggleMenu(); }
+  else if(e.key==='Escape'){ menu.hidden = true; }
+  else if(e.key==='n'||e.key==='N'){ const n=document.getElementById('notes'); n.hidden=!n.hidden; }
+  else if(e.key==='f'||e.key==='F'){ try{ if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{}); else document.exitFullscreen(); }catch(err){} }
+  else if(e.key==='r'||e.key==='R'){ if(cur===0) startLights(); }
+});
+let tx=null; stage.addEventListener('touchstart',e=>{tx=e.touches[0].clientX},{passive:true});
+stage.addEventListener('touchend',e=>{ if(tx===null) return; const d=e.changedTouches[0].clientX-tx; if(Math.abs(d)>40){ if(d<0) next(); else prev(); } tx=null; });
+
+/* lap chart menu */
+const menu = document.getElementById('lapmenu'), lapgrid = document.getElementById('lapgrid');
+slides.forEach((s,i)=>{ const b=document.createElement('button'); b.innerHTML='<span>Lap '+String(i+1).padStart(2,'0')+'</span><b>'+s.dataset.name+'</b>';
+  b.addEventListener('click',()=>{ menu.hidden=true; go(i); }); lapgrid.appendChild(b); });
+function toggleMenu(){ menu.hidden = !menu.hidden; lapgrid.querySelectorAll('button').forEach((b,i)=>b.classList.toggle('cur',i===cur)); if(!menu.hidden) lapgrid.children[cur].focus(); }
+document.getElementById('menuBtn').addEventListener('click',toggleMenu);
+
+window.DECK = { get slide(){ return cur; }, get step(){ return step; }, next, prev, go };
+showStep(slides[0], 0, false);
+enter(slides[0]);
+})();
+</script>

@@ -122,7 +122,15 @@ screenshots, replace those files and run the script again.
 
 ## Presentation
 
-Open `presentation/index.html` in a web browser (double-click it). Use the arrow keys to move between slides.
+Open `presentation/index.html` in a web browser (double-click it). It has the 7 slides the assignment asks for:
+title, dataset, problem, EDA results, dashboard demo, insights and conclusion.
+
+- **Right arrow / space**: next step. Some slides build up over a few clicks, and the EDA slide has four charts.
+- **Left arrow**: back one step.
+- **N**: speaker notes. **M**: slide list. **F**: fullscreen.
+
+The race clock in the top corner starts on your first click and turns red after 7 minutes. The deck needs an internet
+connection for its fonts and animations.
 
 ## Project structure
 
@@ -151,7 +159,8 @@ f1-eda-dashboard/
 │   ├── max_drawing.webp     # my chibi Max drawing
 │   └── make_max_layers.py
 ├── presentation/
-│   └── index.html
+│   ├── index.html
+│   └── dashboard.jpg        # screenshot used on the dashboard slide
 ├── Final_Project___Unit_3.pdf
 ├── requirements.txt
 └── README.md
