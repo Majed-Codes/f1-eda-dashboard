@@ -156,30 +156,43 @@ p{margin:0}
 .split .k em::before{content:"";width:14px;height:14px;background:var(--sw)}
 
 /* 4d dominance */
-.eras{display:flex;flex-direction:column;margin-top:8px;border-top:1px solid var(--line)}
-.era{display:grid;grid-template-columns:180px 300px 1fr 260px;align-items:center;gap:30px;padding:7px 0;border-bottom:1px solid var(--line)}
-.era .yr{font-family:var(--f-mono);font-size:24px;color:var(--mute)}
-.era .tm{font-family:var(--f-display);font-size:36px;font-weight:700;text-transform:uppercase;letter-spacing:.02em}
-.era .track{height:22px;background:var(--panel);position:relative}
-.era .fill{position:absolute;left:0;top:0;bottom:0;background:var(--chalk);transform-origin:left}
-.era.peak .fill{background:linear-gradient(90deg,#9E1407,var(--red))}
-.era.peak .tm{color:var(--red)}
-.era .pc{font-family:var(--f-mono);font-size:26px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
-.era .pc small{font-size:18px;font-weight:400;color:var(--dim);margin-left:12px}
+.racewrap{flex:none;display:grid;grid-template-columns:1fr 470px;gap:70px;align-items:start}
+.race{position:relative;height:500px}
+.yearmark{position:absolute;right:0;bottom:0;font-family:var(--f-display);font-weight:900;font-size:230px;line-height:.8;color:rgba(238,234,226,.08);font-variant-numeric:tabular-nums;pointer-events:none}
+.rrow{position:absolute;left:0;right:0;top:0;height:46px;display:grid;grid-template-columns:230px 1fr;align-items:center;transition:transform .2s ease-out,opacity .4s}
+.rrow .nm{font-family:var(--f-display);font-size:34px;font-weight:700;text-transform:uppercase;text-align:right;padding-right:20px;letter-spacing:.02em;white-space:nowrap}
+.rrow .tr{position:relative;height:32px}
+.rrow .bar{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--c);border-radius:0 5px 5px 0;transition:width .26s linear}
+.rrow .val{position:absolute;top:50%;left:0;transform:translate(14px,-50%);font-family:var(--f-mono);font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;transition:left .26s linear}
+.rrow.zero{opacity:.22}
+.owner{display:flex;flex-direction:column;gap:4px;border-left:8px solid var(--oc,var(--red));background:var(--carbon);padding:20px 28px;transition:border-color .4s}
+.owner .k{font-family:var(--f-mono);font-size:18px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute)}
+.owner .yr{font-family:var(--f-mono);font-size:26px;color:var(--chalk)}
+.owner .tm{font-family:var(--f-display);font-size:56px;font-weight:900;text-transform:uppercase;line-height:1;color:var(--oc,var(--chalk));transition:color .4s}
+.owner .pc{font-family:var(--f-mono);font-size:64px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.owner .of{font-size:22px;color:var(--mute)}
+.erachips{display:flex;flex-direction:column;margin-top:12px;border-top:1px solid var(--line)}
+.ec{display:grid;grid-template-columns:110px 1fr 70px;gap:14px;align-items:center;padding:2px 0;border-bottom:1px solid var(--line);font-size:20px;opacity:.18;transition:opacity .4s}
+.ec.done{opacity:1}
+.ec span:first-child{font-family:var(--f-mono);color:var(--mute);font-size:18px}
+.ec b{font-family:var(--f-display);font-size:24px;font-weight:700;text-transform:uppercase}
+.ec span:last-child{font-family:var(--f-mono);text-align:right;font-weight:700}
+.ec.peak span:last-child{color:var(--red)}
 .drivers{display:flex;gap:44px;align-items:baseline;font-size:24px;color:var(--mute);margin-top:6px}
 .drivers .k{font-family:var(--f-mono);font-size:18px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
 .drivers b{font-family:var(--f-display);font-size:34px;font-weight:700;color:var(--chalk);text-transform:uppercase;margin-right:8px}
 
 /* 5 dashboard */
-.pitwrap{flex:1;display:grid;grid-template-columns:1fr 470px;gap:60px;align-items:start;min-height:0}
+.pitwrap{flex:1;display:grid;grid-template-columns:1fr 500px;gap:60px;align-items:start;min-height:0}
+#s7 h2{font-size:88px}
 .laptop{display:flex;flex-direction:column;align-items:center}
 .lid{position:relative;width:100%;background:#050506;border:14px solid #1B1C21;border-bottom-width:18px;border-radius:24px 24px 0 0;box-shadow:0 50px 120px rgba(0,0,0,.75), 0 0 0 1px #2E2F36}
 .lid img{display:block;width:100%;height:auto}
 .base{width:108%;height:22px;background:linear-gradient(180deg,#3A3B42,#17181C);border-radius:0 0 20px 20px;position:relative}
 .base::before{content:"";position:absolute;left:50%;top:0;width:180px;height:8px;transform:translateX(-50%);background:#0E0E11;border-radius:0 0 10px 10px}
-.pin{position:absolute;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:var(--red);color:var(--asphalt);font-family:var(--f-mono);font-weight:700;font-size:26px;display:grid;place-items:center;box-shadow:0 0 0 6px rgba(255,43,23,.25)}
-.pin::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--red);animation:ping 1.8s ease-out infinite}
-@keyframes ping{from{transform:scale(1);opacity:.9}to{transform:scale(1.9);opacity:0}}
+.pin{position:absolute;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;background:var(--red);color:var(--asphalt);font-family:var(--f-mono);font-weight:700;font-size:20px;display:grid;place-items:center;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+.pin::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:2px solid var(--red);animation:ping 2.4s ease-out infinite}
+@keyframes ping{from{transform:scale(1);opacity:.7}to{transform:scale(1.6);opacity:0}}
 .radio{display:flex;flex-direction:column;gap:22px}
 .radiocard{background:var(--carbon);border:1px solid var(--line);padding:28px 30px;display:flex;flex-direction:column;gap:14px}
 .radiocard .who{display:flex;align-items:center;gap:14px;font-family:var(--f-mono);font-size:20px;letter-spacing:.14em;color:var(--mute)}
@@ -408,12 +421,21 @@ p{margin:0}
       <p class="src">Starters only: did-not-qualify, withdrawn and excluded entries removed · 2020s = 2020–2024</p>
     </div>
 
-    <div class="beat" id="s6" data-name="EDA · Dominance" data-notes="Sector two. Every era has one team on top, and the share keeps growing. Mercedes won 102 of 138 races from 2014 to 2020, that is 74%. Red Bull won 21 of 22 in 2023. And the top drivers sat in those cars: Hamilton, Schumacher and Verstappen all won most with the dominant team of their time.">
+    <div class="beat" id="s6" data-name="EDA · Dominance" data-notes="Sector two. This is a race of total wins, season by season, and on the right is the team that owned each era. Every era has one team on top, and the share keeps growing. Mercedes won 102 of 138 races from 2014 to 2020, that is 74%. Red Bull won 21 of 22 in 2023. And the top drivers sat in those cars: Hamilton, Schumacher and Verstappen all won most with the dominant team of their time.">
       <p class="eyebrow" data-in>EDA · Sector 2 · Constructor dominance</p>
       <h2 data-in>Every era has an owner</h2>
-      <div class="eras" id="eras" data-in></div>
-      <div class="drivers" data-in><span class="k">Most race wins</span><span><b>Hamilton</b>105 · Mercedes</span><span><b>Schumacher</b>91 · Ferrari</span><span><b>Verstappen</b>63 · Red Bull</span><span><b>Vettel</b>53 · Red Bull</span></div>
-      <p class="src">Share of race wins taken by the most successful constructor in each period · 1950–2024</p>
+      <div class="racewrap">
+        <div class="race" id="race" data-in><span class="yearmark" id="raceYear">1950</span></div>
+        <div class="owner" id="owner" data-in>
+          <span class="k">Era owner</span>
+          <span class="yr" id="ownYr">1950–59</span>
+          <span class="tm" id="ownTm">Ferrari</span>
+          <span class="pc" id="ownPc">0%</span>
+          <span class="of" id="ownOf">of the wins</span>
+          <div class="erachips" id="eraChips"></div>
+        </div>
+      </div>
+      <div class="drivers" data-in><span class="k">Top drivers, same cars</span><span><b>Hamilton</b>105 · Mercedes</span><span><b>Schumacher</b>91 · Ferrari</span><span><b>Verstappen</b>63 · Red Bull</span><span><b>Vettel</b>53 · Red Bull</span></div>
     </div>
   </section>
 
@@ -425,9 +447,9 @@ p{margin:0}
       <div class="laptop" data-in>
         <div class="lid">
           <img src="dashboard.jpg" alt="The Lights Out Streamlit dashboard: filter bar, the answer Mostly yes, four stat cards and the Max assistant">
-          <span class="pin" style="left:50%;top:12%">1</span>
-          <span class="pin" style="left:30%;top:66%">2</span>
-          <span class="pin" style="left:93%;top:80%">3</span>
+          <span class="pin" style="left:8%;top:11%">1</span>
+          <span class="pin" style="left:8%;top:58.5%">2</span>
+          <span class="pin" style="left:94%;top:72%">3</span>
         </div>
         <div class="base"></div>
       </div>
@@ -562,18 +584,54 @@ decades.forEach((d,i)=>{
     lb.setAttribute('font-family','JetBrains Mono, monospace'); lb.setAttribute('font-size','24'); lb.setAttribute('font-weight','700'); lb.setAttribute('fill','#EEEAE2'); lb.textContent=Math.round(dnf[i])+'%'; dots.appendChild(lb); }
 });
 
-const eras = [
-  ['1950–59','Ferrari',30,87],['1960–69','Lotus-Climax',22,100],['1970–79','Ferrari',37,144],
-  ['1980–89','McLaren',56,156],['1990–99','Williams',61,162],['2000–09','Ferrari',85,174],
-  ['2010–13','Red Bull',41,77],['2014–20','Mercedes',102,138],['2021–24','Red Bull',58,90]];
-const erasEl = document.getElementById('eras');
-eras.forEach(e=>{
-  const pct = Math.round(e[2]/e[3]*100);
-  const r = document.createElement('div'); r.className='era'+(pct>=60?' peak':'');
-  r.dataset.tip = e[0]+' · '+e[1]+' won '+e[2]+' of '+e[3]+' races';
-  r.innerHTML = '<span class="yr">'+e[0]+'</span><span class="tm">'+e[1]+'</span><div class="track"><div class="fill" style="width:'+pct+'%"></div></div><span class="pc">'+pct+'%<small>'+e[2]+' of '+e[3]+' wins</small></span>';
-  erasEl.appendChild(r);
-});
+/* ---------- dominance: bar chart race of total wins, with the owner of each era ---------- */
+const RACE = {"years":[1950,1951,1952,1953,1954,1955,1956,1957,1958,1959,1960,1961,1962,1963,1964,1965,1966,1967,1968,1969,1970,1971,1972,1973,1974,1975,1976,1977,1978,1979,1980,1981,1982,1983,1984,1985,1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024],"teams":[{"name":"Ferrari","color":"#E8002D"},{"name":"McLaren","color":"#FF8000"},{"name":"Mercedes","color":"#27F4D2"},{"name":"Red Bull","color":"#3671C6"},{"name":"Williams","color":"#64C4FF"},{"name":"Team Lotus","color":"#FFDD00"},{"name":"Renault","color":"#FFF500"},{"name":"Benetton","color":"#00A651"},{"name":"Brabham","color":"#2D7D46"},{"name":"Tyrrell","color":"#4A6FD1"}],"cum":[[0,0,0,0,0,0,0,0,0,0],[3,0,0,0,0,0,0,0,0,0],[10,0,0,0,0,0,0,0,0,0],[17,0,0,0,0,0,0,0,0,0],[19,0,4,0,0,0,0,0,0,0],[20,0,9,0,0,0,0,0,0,0],[26,0,9,0,0,0,0,0,0,0],[26,0,9,0,0,0,0,0,0,0],[28,0,9,0,0,0,0,0,0,0],[30,0,9,0,0,0,0,0,0,0],[31,0,9,0,0,2,0,0,0,0],[36,0,9,0,0,2,0,0,0,0],[36,0,9,0,0,2,0,0,0,0],[37,0,9,0,0,2,0,0,0,0],[40,0,9,0,0,2,0,0,0,0],[40,0,9,0,0,2,0,0,0,0],[42,0,9,0,0,2,0,0,0,0],[42,0,9,0,0,2,0,0,0,0],[43,0,9,0,0,2,0,0,0,0],[43,0,9,0,0,2,0,0,0,0],[47,0,9,0,0,8,0,0,1,0],[49,0,9,0,0,8,0,0,1,7],[50,1,9,0,0,13,0,0,1,11],[50,4,9,0,0,20,0,0,1,16],[53,8,9,0,0,23,0,0,4,18],[59,11,9,0,0,23,0,0,6,19],[65,17,9,0,0,24,0,0,6,20],[69,20,9,0,0,29,0,0,6,20],[74,20,9,0,0,37,0,0,8,21],[80,20,9,0,5,37,1,0,8,21],[80,20,9,0,11,37,4,0,11,21],[82,21,9,0,15,37,7,0,14,21],[85,25,9,0,16,38,11,0,16,22],[89,26,9,0,17,38,15,0,20,23],[90,38,9,0,18,38,15,0,22,23],[92,44,9,0,22,41,15,0,23,23],[92,48,9,0,31,43,15,1,23,23],[94,51,9,0,40,45,15,1,23,23],[95,66,9,0,40,45,15,1,23,23],[98,76,9,0,42,45,15,2,23,23],[104,82,9,0,44,45,15,4,23,23],[104,90,9,0,51,45,15,5,23,23],[104,95,9,0,61,45,15,6,23,23],[104,100,9,0,71,45,15,7,23,23],[105,100,9,0,78,45,15,15,23,23],[106,100,9,0,83,45,15,26,23,23],[109,100,9,0,95,45,15,26,23,23],[114,103,9,0,103,45,15,27,23,23],[120,112,9,0,103,45,15,27,23,23],[126,119,9,0,103,45,15,27,23,23],[136,126,9,0,103,45,15,27,23,23],[145,130,9,0,107,45,15,27,23,23],[160,131,9,0,108,45,15,27,23,23],[168,133,9,0,112,45,16,27,23,23],[183,134,9,0,113,45,17,27,23,23],[184,144,9,0,113,45,25,27,23,23],[193,144,9,0,113,45,33,27,23,23],[202,152,9,0,113,45,33,27,23,23],[210,158,9,0,113,45,35,27,23,23],[211,160,9,6,113,45,35,27,23,23],[216,165,9,15,113,45,35,27,23,23],[217,171,9,27,113,45,35,27,23,23],[220,178,10,34,114,45,35,27,23,23],[222,178,13,47,114,45,35,27,23,23],[222,178,29,50,114,45,35,27,23,23],[225,178,45,50,114,45,35,27,23,23],[225,178,64,52,114,45,35,27,23,23],[230,178,76,55,114,45,35,27,23,23],[236,178,87,59,114,45,35,27,23,23],[239,178,102,62,114,45,35,27,23,23],[239,178,115,64,114,45,35,27,23,23],[239,179,124,75,114,45,35,27,23,23],[243,179,125,92,114,45,35,27,23,23],[244,179,125,113,114,45,35,27,23,23],[249,185,129,122,114,45,35,27,23,23]],"ownerWins":[0,3,7,7,2,1,6,0,2,2,0,3,3,7,3,6,0,0,0,0,4,2,1,0,3,6,6,4,5,6,0,1,4,1,12,6,4,3,15,10,2,7,10,10,7,5,12,8,0,0,10,9,15,8,15,1,9,9,8,1,9,12,7,13,16,16,19,12,11,15,13,11,17,21,9],"races":[7,9,8,9,9,7,9,9,11,9,10,8,9,10,10,10,9,11,12,11,13,11,12,15,15,14,16,17,16,15,14,15,16,15,16,16,16,16,16,16,16,16,16,16,16,17,16,17,16,16,17,17,17,16,18,19,18,17,18,17,19,19,20,19,19,19,21,20,21,21,17,22,22,22,24],"eras":[{"label":"1950–59","start":1950,"end":1959,"owner":"Ferrari","color":"#E8002D","wins":30,"races":87},{"label":"1960–69","start":1960,"end":1969,"owner":"Lotus-Climax","color":"#2E6B30","wins":22,"races":100},{"label":"1970–79","start":1970,"end":1979,"owner":"Ferrari","color":"#E8002D","wins":37,"races":144},{"label":"1980–89","start":1980,"end":1989,"owner":"McLaren","color":"#FF8000","wins":56,"races":156},{"label":"1990–99","start":1990,"end":1999,"owner":"Williams","color":"#64C4FF","wins":61,"races":162},{"label":"2000–09","start":2000,"end":2009,"owner":"Ferrari","color":"#E8002D","wins":85,"races":174},{"label":"2010–13","start":2010,"end":2013,"owner":"Red Bull","color":"#3671C6","wins":41,"races":77},{"label":"2014–20","start":2014,"end":2020,"owner":"Mercedes","color":"#27F4D2","wins":102,"races":138},{"label":"2021–24","start":2021,"end":2024,"owner":"Red Bull","color":"#3671C6","wins":58,"races":90}]};
+const raceEl = document.getElementById('race'), yearEl = document.getElementById('raceYear');
+const ROW = 50, rows = RACE.teams.map(t=>{
+  const r = document.createElement('div'); r.className = 'rrow'; r.style.setProperty('--c', t.color);
+  r.innerHTML = '<span class="nm">'+t.name+'</span><span class="tr"><i class="bar"></i><span class="val">0</span></span>';
+  raceEl.appendChild(r); return r; });
+const chipsEl = document.getElementById('eraChips');
+const chips = RACE.eras.map(e=>{
+  const c = document.createElement('div'), pct = Math.round(e.wins/e.races*100);
+  c.className = 'ec' + (pct>=60 ? ' peak' : ''); c.dataset.tip = e.label+' · '+e.owner+' took '+e.wins+' of '+e.races+' wins';
+  c.innerHTML = '<span>'+e.label+'</span><b style="color:'+e.color+'">'+e.owner+'</b><span>'+pct+'%</span>';
+  chipsEl.appendChild(c); return c; });
+const ownerEl = document.getElementById('owner');
+function raceFrame(k){
+  const vals = RACE.cum[k], top = Math.max(1, ...vals);
+  const order = vals.map((v,i)=>[v,i]).sort((a,b)=> b[0]-a[0] || a[1]-b[1]).map(x=>x[1]);
+  order.forEach((ti,rank)=>{
+    const r = rows[ti], v = vals[ti], w = (v/top*86).toFixed(2)+'%';
+    r.style.transform = 'translateY('+(rank*ROW)+'px)';
+    r.querySelector('.bar').style.width = w; r.querySelector('.val').style.left = w;
+    r.querySelector('.val').textContent = v; r.classList.toggle('zero', v===0);
+  });
+  const y = RACE.years[k]; yearEl.textContent = y;
+  const ei = RACE.eras.findIndex(e=> y>=e.start && y<=e.end); if(ei<0) return;
+  const e = RACE.eras[ei]; let w = 0, n = 0;
+  for(let q=0;q<=k;q++){ if(RACE.years[q]>=e.start){ w += RACE.ownerWins[q]; n += RACE.races[q]; } }
+  ownerEl.style.setProperty('--oc', e.color);
+  document.getElementById('ownYr').textContent = e.label;
+  document.getElementById('ownTm').textContent = e.owner;
+  document.getElementById('ownPc').textContent = Math.round(w/Math.max(1,n)*100)+'%';
+  document.getElementById('ownOf').textContent = w+' of '+n+' wins';
+  chips.forEach((c,i)=> c.classList.toggle('done', i<ei || (i===ei && y===e.end)));
+}
+let raceTimer = null;
+function stopRace(){ clearInterval(raceTimer); raceTimer = null; }
+function startRace(){
+  stopRace();
+  if(reduce){ raceFrame(RACE.years.length-1); return; }
+  let k = 0; raceFrame(0);
+  raceTimer = setInterval(()=>{
+    const beat = document.getElementById('s6');
+    if(!beat.classList.contains('on') || !beat.closest('.slide').classList.contains('active')){ stopRace(); return; }
+    k++; if(k >= RACE.years.length){ stopRace(); return; }
+    raceFrame(k);
+  }, 260);
+}
+raceFrame(RACE.years.length-1);
 
 const wave = document.getElementById('wave');
 for(let i=0;i<40;i++){ const b=document.createElement('i'); wave.appendChild(b); }
@@ -690,14 +748,14 @@ function enter(el){
     G.fromTo('#dots > *',{opacity:0,scale:0,transformOrigin:'center'},{opacity:1,scale:1,duration:.4,stagger:.12,delay:.5});
     G.fromTo(el.querySelectorAll('.split .bar i'),{scaleX:0},{scaleX:1,duration:.9,ease:'expo.out',stagger:.15,delay:1});
   }
-  if(id==='s6') G.fromTo(el.querySelectorAll('.era .fill'),{scaleX:0},{scaleX:1,duration:1,ease:'expo.out',stagger:.08,delay:.3});
+  if(id==='s6') setTimeout(startRace, 450);
   if(id==='s7') animateWave();
   if(id==='s8'){ G.fromTo(el.querySelectorAll('.block'),{scaleY:0},{scaleY:1,duration:1,ease:'back.out(1.4)',stagger:{each:.22,from:'center'},delay:.2});
     setTimeout(()=>{ if(slides[cur]===el){ burst(960,640); setTimeout(()=>{ burst(420,760); burst(1500,800); },350); } },700); }
 }
 function animateWave(){
   if(!G || reduce) return;
-  wave.querySelectorAll('i').forEach((b,i)=>{ G.fromTo(b,{height:'15%'},{height:()=> (25+Math.random()*75)+'%',duration:.18+Math.random()*.2,repeat:9,yoyo:true,ease:'sine.inOut',delay:i*.015}); });
+  wave.querySelectorAll('i').forEach((b,i)=>{ G.killTweensOf(b); G.fromTo(b,{height:'15%'},{height:()=> (25+Math.random()*75)+'%',duration:.18+Math.random()*.2,repeat:-1,repeatRefresh:true,yoyo:true,ease:'sine.inOut',delay:i*.015}); });
 }
 
 /* ---------- start lights ---------- */
@@ -789,7 +847,7 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='Escape'){ menu.hidden = true; }
   else if(e.key==='n'||e.key==='N'){ const n=document.getElementById('notes'); n.hidden=!n.hidden; }
   else if(e.key==='f'||e.key==='F'){ try{ if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{}); else document.exitFullscreen(); }catch(err){} }
-  else if(e.key==='r'||e.key==='R'){ if(cur===0) startLights(); }
+  else if(e.key==='r'||e.key==='R'){ if(cur===0) startLights(); else if(document.getElementById('s6').classList.contains('on') && slides[cur].id==='sEDA') startRace(); }
 });
 let tx=null; stage.addEventListener('touchstart',e=>{tx=e.touches[0].clientX},{passive:true});
 stage.addEventListener('touchend',e=>{ if(tx===null) return; const d=e.changedTouches[0].clientX-tx; if(Math.abs(d)>40){ if(d<0) next(); else prev(); } tx=null; });
