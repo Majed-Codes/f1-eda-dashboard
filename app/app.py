@@ -43,6 +43,7 @@ st.markdown(f"""
 .brand span {{ color: {RED}; }}
 .brand-sub {{ color: {FAINT}; font-size: 12px; margin-top: 2px; }}
 .st-key-filterbar [data-testid="stButton"] {{ padding-top: 26px; }}
+.st-key-filterbar [data-testid="stButton"] button p {{ white-space: nowrap; }}
 
 /* five start lights: on one by one, then all out */
 .lights {{ display: flex; gap: 12px; margin: 30px 0 26px 0; }}

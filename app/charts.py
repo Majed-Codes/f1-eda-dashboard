@@ -59,11 +59,14 @@ if (typeof echarts === 'undefined') {
   const box = document.getElementById('c');
   const chart = echarts.init(box, null, { renderer: 'canvas' });
   const OPTION = __OPTION_JSON__;
-  window.addEventListener('resize', () => chart.resize());
+  // charts that must fit their width (rings, radar) set window.fit(option, w, h) to size themselves to the real frame
+  const H = __H__;
+  const build = () => { const o = revive(JSON.parse(OPTION)); return window.fit ? window.fit(o, box.clientWidth, H) : o; };
+  window.addEventListener('resize', () => { chart.resize(); if (shown && window.fit) chart.setOption(build()); });
   __SCRIPT__
   let shown = false;
   function animateIn() {
-    chart.resize(); chart.clear(); chart.setOption(revive(JSON.parse(OPTION)));
+    chart.resize(); chart.clear(); chart.setOption(build());
     if (window.afterShow) window.afterShow();
   }
   new IntersectionObserver(entries => {
@@ -365,7 +368,17 @@ def rings(items, height=230):
                        'fontSize': 24, 'fontWeight': 800},
             'data': [{'value': round(value), 'name': name}],
             'animationDuration': 1600 + i * 250, 'animationEasing': 'cubicOut'})
-    render({'series': series}, height)
+    # size each ring from its share of the width too, so the outer rings and their glow never touch the edges
+    fit = '''window.fit = (o, w, h) => {
+      const slot = w / o.series.length, r = Math.max(26, Math.min(h * 0.29, slot * 0.33));
+      o.series.forEach(s => {
+        s.radius = r; s.progress.width = s.axisLine.lineStyle.width = Math.max(6, Math.round(r * 0.17));
+        s.detail.fontSize = Math.max(14, Math.round(r * 0.36));
+        Object.assign(s.title, { fontSize: slot < 150 ? 11 : 13, width: slot - 12, overflow: 'break', lineHeight: 15 });
+      });
+      return o;
+    };'''
+    render({'series': series}, height, fit)
 
 
 def radar(labels, maxes, driver_vals, field_vals, driver_name, color, height=330):
@@ -374,8 +387,9 @@ def radar(labels, maxes, driver_vals, field_vals, driver_name, color, height=330
         'title': title('Against the field'),
         'legend': {'bottom': 0, 'textStyle': {'color': MUTED}, 'itemWidth': 12, 'itemHeight': 12, 'icon': 'roundRect'},
         'tooltip': {'trigger': 'item', 'formatter': '__fn__function (p) { const L = ' + labels_js + '; return "<b>" + p.name + "</b><br/>" + p.value.map((v, i) => L[i] + ": " + v + "%").join("<br/>"); }'},
-        'radar': {'indicator': [{'name': l, 'max': m} for l, m in zip(labels, maxes)], 'radius': '58%', 'center': ['50%', '54%'],
-                  'splitNumber': 4, 'axisName': {'color': MUTED, 'fontSize': 12},
+        'radar': {'indicator': [{'name': l.replace(' ', '\n', 1) if len(l) > 9 else l, 'max': m} for l, m in zip(labels, maxes)],
+                  'radius': '58%', 'center': ['50%', '50%'],
+                  'splitNumber': 4, 'axisName': {'color': MUTED, 'fontSize': 12, 'lineHeight': 15},
                   'splitLine': {'lineStyle': {'color': 'rgba(255,255,255,0.08)'}},
                   'splitArea': {'areaStyle': {'color': ['rgba(255,255,255,0.015)', 'rgba(255,255,255,0.035)']}},
                   'axisLine': {'lineStyle': {'color': 'rgba(255,255,255,0.08)'}}},
@@ -387,7 +401,7 @@ def radar(labels, maxes, driver_vals, field_vals, driver_name, color, height=330
              'lineStyle': {'color': color, 'width': 2.5}, 'itemStyle': {'color': color},
              'areaStyle': {'color': color + '40'}}]}],
         'animationDuration': 1800, 'animationEasing': 'elasticOut',
-    }, height)
+    }, height, '''window.fit = (o, w, h) => { o.radar.radius = Math.max(36, Math.min(h * 0.27, w / 2 - 74)); return o; };''')
 
 
 def race_scatter(points, height=420):
@@ -400,19 +414,18 @@ def race_scatter(points, height=420):
         pts = [{'value': [p['x'], p['y']], 'race': p['race']} for p in points if p['kind'] == kind]
         if not pts:
             continue
-        series.append({'name': kind, 'type': 'scatter', 'data': pts, 'symbolSize': size,
+        series.append({'name': kind, 'type': 'scatter', 'data': pts, 'symbolSize': size, 'clip': False,
                        'itemStyle': {'color': color, 'opacity': 0.9, 'borderColor': '#0A0A0C', 'borderWidth': 1,
                                      'shadowColor': color if kind in ('Win', 'Podium') else 'transparent',
                                      'shadowBlur': 10 if kind == 'Win' else 0},
                        'emphasis': {'scale': 1.6},
                        'animationDelay': '__fn__function (i) { return 200 + i * 12; }',
                        'animationDuration': 900, 'animationEasing': 'backOut'})
-    series.append({'type': 'line', 'data': [[1, 1], [top, top]], 'symbol': 'none', 'silent': True,
+    end = {'value': [top, top], 'label': {'show': True, 'formatter': 'finished where they started', 'color': FAINT,
+                                          'fontSize': 11, 'position': 'top', 'align': 'right', 'offset': [-4, -2]}}
+    series.append({'type': 'line', 'data': [[1, 1], end], 'symbol': 'circle', 'symbolSize': 0, 'silent': True,
                    'lineStyle': {'color': 'rgba(255,255,255,0.18)', 'type': 'dashed', 'width': 1.5},
-                   'z': 0, 'animationDuration': 1500,
-                   'markPoint': {'symbol': 'none', 'data': []},
-                   'endLabel': {'show': True, 'formatter': 'finished where they started', 'color': FAINT,
-                                'fontSize': 11, 'offset': [-180, -12]}})
+                   'z': 0, 'animationDuration': 1500})
     render({
         'title': title('Every race: grid slot vs result'),
         'legend': {'top': 30, 'left': 0, 'textStyle': {'color': MUTED}, 'itemWidth': 10, 'itemHeight': 10},
