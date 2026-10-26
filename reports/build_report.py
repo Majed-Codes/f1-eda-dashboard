@@ -199,7 +199,7 @@ story += [p("2. Data Exploration", h1),
           p("Missing values after reading \\N correctly", h2),
           table([["Column", "Missing", "Why it is missing"],
                  ["position", "10,953", "Driver was not classified (DNF, DNQ and so on)"],
-                 ["milliseconds / time", "19,079", "Race time only exists for classified finishers"],
+                 ["milliseconds / time", "19,079", "Race time only exists for drivers who finished on the lead lap"],
                  ["fastestLapTime / fastestLapSpeed", "18,507", "Fastest lap data only exists from 2004"]],
                 [5.4 * cm, 2.2 * cm, 9 * cm]),
           PageBreak()]
