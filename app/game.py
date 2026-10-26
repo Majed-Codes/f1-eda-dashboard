@@ -15,7 +15,7 @@ import numpy as np
 import streamlit as st
 import streamlit.components.v1 as components
 
-from polly import chibi_svg
+from mascot import chibi_svg
 
 try:
     import segno   # QR codes for the online rooms; without it the room shows the code and link only
@@ -144,8 +144,8 @@ def _save_best(game, r):
         best[name] = min(best.get(name, 10 ** 9), r['best_ms'])
 
 
-def _polly(line, mood, size=140):
-    st.markdown(f'<div class="polly-card"><div class="bubble">{line}</div>{chibi_svg(size, mood=mood, uid="arc" + mood)}'
+def _mascot(line, mood, size=140):
+    st.markdown(f'<div class="mascot-card"><div class="bubble">{line}</div>{chibi_svg(size, mood=mood, uid="arc" + mood)}'
                 '</div>', unsafe_allow_html=True)
 
 
@@ -221,7 +221,7 @@ def run_screen(df):
         with right:
             top = sorted(s['result'], key=lambda r: rank_key(game, r))[0]
             mood, line = mood_for(game, top)
-            _polly(line if s['mode'] == 'solo' else f'{top["name"]} wins! 🏆', mood)
+            _mascot(line if s['mode'] == 'solo' else f'{top["name"]} wins! 🏆', mood)
     c1, c2, _ = st.columns([1, 1, 2])
     c1.button('Play again', type='primary', width='stretch', on_click=_new_run,
               args=(game, s['mode'], s['names'], df))
@@ -487,7 +487,7 @@ def online_live(df):
     left, right = st.columns([2, 1], gap='large')
     left.markdown(f'<div class="gp-podium">{steps}</div>', unsafe_allow_html=True)
     with right:
-        _polly(f'{order[0]["name"]} is the champion! 🏆', 'wow', 150)
+        _mascot(f'{order[0]["name"]} is the champion! 🏆', 'wow', 150)
     if is_host:
         st.button('New championship', type='primary', on_click=new_championship, args=(code,))
     st.button('Leave room', key='arc_leave_final', on_click=leave_room)

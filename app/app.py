@@ -7,7 +7,7 @@ from sklearn.linear_model import LogisticRegression
 
 import charts
 import game
-import polly
+import mascot
 
 # run it with: streamlit run app/app.py
 
@@ -129,7 +129,7 @@ button[data-baseweb="tab"][aria-selected="true"] p {{ color: {INK}; }}
 """, unsafe_allow_html=True)
 
 
-st.markdown('<style>' + polly.CHIBI_CSS + game.GAME_CSS + '</style>', unsafe_allow_html=True)
+st.markdown('<style>' + mascot.CHIBI_CSS + game.GAME_CSS + '</style>', unsafe_allow_html=True)
 
 
 @st.cache_data
@@ -573,7 +573,7 @@ st.markdown('<div class="footer"><b>About the data.</b> Every Formula 1 World Ch
             'Championship (1950–2020), Rohan Rao on Kaggle</a>, built from the Ergast API. '
             'Unit 3 Final Project · Majed Alotaibi · University of Hail.</div>', unsafe_allow_html=True)
 
-# ---------------- Polly ----------------
+# ---------------- Chibi Max ----------------
 filters_text = (f'Dashboard filters: seasons {years[0]}-{years[1]}; constructors: '
                 f'{", ".join(teams) if teams else "all"}; circuit: {circuit}')
-polly.widget(df, train_model(), filters_text)
+mascot.widget(df, train_model(), filters_text)

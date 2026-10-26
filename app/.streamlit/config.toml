@@ -17,3 +17,7 @@ secondaryBackgroundColor = "#1A1A20"
 
 [client]
 toolbarMode = "minimal"
+
+[server]
+# serves app/static (the chibi Max drawings)
+enableStaticServing = true

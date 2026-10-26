@@ -75,19 +75,25 @@ dashboard needs an internet connection to draw them (everything else works offli
 The dark/red theme is in `app/.streamlit/config.toml`. Streamlit reads the config from the folder
 you run the command in, so the same file is also at `.streamlit/config.toml` in the repo root.
 
-### Polly (AI assistant)
+### Chibi Max (AI assistant)
 
-Polly is a chibi assistant who floats in the corner of the dashboard. Drag her anywhere (she remembers where you left
-her), and double-click her (double-tap on a phone) to open a chat window. She answers questions about the data. Her answers come from Claude
-(`claude-opus-5-5`), and every number she gives comes from tools that query `clean_data.csv`, so she does not guess
-statistics. To turn her on, create `.streamlit/secrets.toml` in the repo root:
+Chibi Max is my own chibi drawing of Max Verstappen, and he floats in the corner of the dashboard as the assistant.
+He bounces, blinks, follows your mouse with his eyes, and drops the straight face when the mouse gets close. Drag him
+anywhere (he remembers where you left him), and double-click him (double-tap on a phone) to open a chat window.
+He is a fan drawing, not the real driver, and the assistant is told never to speak for him.
+
+His answers come from Claude (`claude-opus-5-5`), and every number he gives comes from tools that query
+`clean_data.csv`, so he does not guess statistics. To turn him on, create `.streamlit/secrets.toml` in the repo root:
 
 ```toml
 ANTHROPIC_API_KEY = "your-key-here"
 ```
 
 The file is in `.gitignore`, so the key is never committed. Without a key the rest of the dashboard still works and
-Polly explains how to add one. Each question costs a few cents of API credit.
+Max explains how to add one. Each question costs a few cents of API credit.
+
+The drawing is in `tools/max_drawing.webp`. `python tools/make_max_layers.py` cuts it into the head and body layers
+in `app/static/`, which Streamlit serves because `enableStaticServing` is on in the config.
 
 ### Lights Out Arcade (mini games)
 
@@ -130,7 +136,8 @@ f1-eda-dashboard/
 │   ├── app.py               # the dashboard
 │   ├── charts.py            # animated ECharts charts
 │   ├── game.py              # Lights Out Arcade and online rooms
-│   ├── polly.py             # Polly, the AI assistant
+│   ├── mascot.py            # Chibi Max, the AI assistant
+│   ├── static/              # Max's drawing layers
 │   ├── arcade/index.html    # the canvas mini games
 │   ├── clean_data.csv
 │   └── .streamlit/config.toml
@@ -139,6 +146,9 @@ f1-eda-dashboard/
 │   ├── screenshots/
 │   ├── build_report.py
 │   └── F1_EDA_Report.pdf
+├── tools/
+│   ├── max_drawing.webp     # my chibi Max drawing
+│   └── make_max_layers.py
 ├── presentation/
 │   └── index.html
 ├── Final_Project___Unit_3.pdf
