@@ -277,19 +277,26 @@ story += [p("4. Exploratory Data Analysis", h1),
 story += [p("5. Dashboard Overview", h1),
           p("The Streamlit dashboard (<font face='Courier'>app/app.py</font>) loads clean_data.csv and lets the user "
             "explore the same questions. Run it with <font face='Courier'>streamlit run app/app.py</font>."),
-          *bullets(["<b>Sidebar:</b> short dataset description, a season range slider (default 2010-2024), a "
-                    "constructor multiselect and a circuit dropdown.",
-                    "<b>KPI row:</b> races, share of wins from pole, share of wins from the front row, and DNF rate, all "
-                    "for the current filters.",
-                    "<b>Interactive Plotly charts:</b> grid vs finish scatter, wins by team, DNF rate per season and podium "
-                    "rate by grid slot. All of them update with the filters.",
-                    "<b>Insights:</b> four short takeaways from the analysis.",
-                    "<b>Predict podium chance:</b> pick a grid slot, team and season and the logistic regression gives a probability.",
-                    "<b>Data preview and summary statistics</b> of the filtered rows."]),
+          *bullets(["<b>Sidebar:</b> a short description of the dataset, a season range slider (default 2010-2024), a "
+                    "constructor multiselect, a circuit dropdown and a reset button.",
+                    "<b>Headline:</b> the main question with a short answer that changes with the filters, and four stat "
+                    "tiles: wins from pole, wins from the front row, finishers within 3 places of their grid slot, and DNF "
+                    "rate. Each tile shows how far the selection is from the 1950-2024 value.",
+                    "<b>Qualifying tab:</b> win, podium or points rate by grid slot (switchable), a grid vs result heatmap "
+                    "and the distribution of places gained or lost.",
+                    "<b>Dominance tab:</b> the leading team's share of wins in every season, the teams with the most wins, "
+                    "and a table of the top team in each era.",
+                    "<b>Reliability tab:</b> DNF rate per season (all and mechanical) and what ended the race in each decade.",
+                    "<b>Drivers tab:</b> pick a driver to see starts, wins, podiums, pole starts, places gained and "
+                    "podiums per season.",
+                    "<b>Predict tab:</b> pick a grid slot, team and season and the logistic regression gives a podium "
+                    "chance, with the chance from every grid slot shown as a bar chart.",
+                    "<b>Data tab:</b> a preview of the filtered rows, summary statistics and a CSV download.",
+                    "Every chart has hover details, and each tab ends with a short insight written from the filtered data."]),
           Spacer(1, 6),
-          screenshot(1, "Figure 11. Sidebar filters, KPI row and the first two charts."),
-          screenshot(2, "Figure 12. DNF rate over time and podium rate by grid slot."),
-          screenshot(3, "Figure 13. Insights, the podium prediction widget and the data preview."),
+          screenshot(1, "Figure 11. Sidebar filters, the headline answer and the four stat tiles."),
+          screenshot(2, "Figure 12. Qualifying tab: rate by grid slot, grid vs result heatmap and places gained."),
+          screenshot(3, "Figure 13. Predict tab: podium chance for a chosen grid slot, team and season."),
           PageBreak()]
 
 # 8. Insights & conclusion

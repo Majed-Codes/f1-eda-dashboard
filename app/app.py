@@ -2,18 +2,70 @@ import os
 
 import numpy as np
 import pandas as pd
-import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 from sklearn.linear_model import LogisticRegression
 
-#run it with: streamlit run app/app.py
+# run it with: streamlit run app/app.py
 
-st.set_page_config(page_title='F1 EDA Dashboard', page_icon='🏁', layout='wide')
+st.set_page_config(page_title='Lights Out · F1 1950–2024', page_icon='🏁', layout='wide')
 
-red = '#FF2B17'
+# colors: one red accent, everything else is grey
+RED = '#FF2B17'
+INK = '#F5F5F7'
+MUTED = '#A1A1A6'
+FAINT = '#6E6E73'
+GREY = '#3A3A41'
+SURFACE = '#141418'
+BG = '#0A0A0C'
+FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
+
+st.markdown(f"""
+<style>
+[data-testid="stHeader"] {{ background: transparent; }}
+[data-testid="stDecoration"] {{ display: none; }}
+[data-testid="stMainBlockContainer"], .block-container {{ max-width: 1240px; padding-top: 3rem; padding-bottom: 5rem; }}
+
+.eyebrow {{ color: {RED}; font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; }}
+.hero-title {{ color: {INK}; font-size: clamp(40px, 6vw, 72px); font-weight: 700; letter-spacing: -0.035em; line-height: 1.02; margin: 0 0 18px 0; }}
+.hero-answer {{ color: {INK}; font-size: clamp(22px, 2.6vw, 30px); font-weight: 600; letter-spacing: -0.02em; margin: 0 0 6px 0; }}
+.hero-sub {{ color: {MUTED}; font-size: 19px; line-height: 1.5; max-width: 760px; margin: 0 0 8px 0; }}
+.hero-meta {{ color: {FAINT}; font-size: 14px; margin: 14px 0 34px 0; }}
+
+.stat-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 44px; }}
+.stat {{ background: {SURFACE}; border: 1px solid rgba(255,255,255,0.07); border-radius: 20px; padding: 22px 24px 20px; }}
+.stat-label {{ color: {MUTED}; font-size: 14px; font-weight: 500; margin-bottom: 10px; }}
+.stat-value {{ color: {INK}; font-size: 46px; font-weight: 600; letter-spacing: -0.03em; line-height: 1; }}
+.stat-value.accent {{ color: {RED}; }}
+.stat-note {{ color: {FAINT}; font-size: 13px; margin-top: 10px; min-height: 18px; }}
+
+.section-title {{ color: {INK}; font-size: clamp(26px, 3vw, 36px); font-weight: 700; letter-spacing: -0.025em; line-height: 1.15; margin: 8px 0 10px 0; }}
+.lede {{ color: {MUTED}; font-size: 17px; line-height: 1.55; max-width: 780px; margin: 0 0 22px 0; }}
+.lede b {{ color: {INK}; font-weight: 600; }}
+.note {{ color: {FAINT}; font-size: 13px; line-height: 1.5; }}
+
+.insight {{ border-left: 2px solid {RED}; padding: 4px 0 4px 16px; margin: 8px 0 22px 0; color: {MUTED}; font-size: 15px; line-height: 1.55; }}
+.insight b {{ color: {INK}; }}
+
+.big-prob {{ color: {INK}; font-size: 88px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }}
+.big-prob span {{ color: {RED}; }}
+
+@media (max-width: 640px) {{ .stat {{ padding: 16px 16px 14px; }} .stat-value {{ font-size: 34px; }} .big-prob {{ font-size: 64px; }} }}
+
+[data-baseweb="tab-list"] {{ gap: 6px; border-bottom: 1px solid rgba(255,255,255,0.08); }}
+button[data-baseweb="tab"] {{ padding: 10px 14px; }}
+button[data-baseweb="tab"] p {{ font-size: 15px; font-weight: 500; }}
+[data-baseweb="tab-border"] {{ display: none; }}
+[data-baseweb="tab-panel"] {{ padding-top: 28px; }}
+
+[data-testid="stSidebar"] .brand {{ color: {INK}; font-size: 26px; font-weight: 700; letter-spacing: -0.03em; margin: 0; }}
+[data-testid="stSidebar"] .brand span {{ color: {RED}; }}
+[data-testid="stSidebar"] .side-label {{ color: {FAINT}; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin: 22px 0 6px 0; }}
+[data-testid="stSidebar"] .side-text {{ color: {MUTED}; font-size: 14px; line-height: 1.5; }}
+</style>
+""", unsafe_allow_html=True)
 
 
-#load the data once so the app doesnt read the csv every time a filter changes
 @st.cache_data
 def load_data():
     path = os.path.join(os.path.dirname(__file__), 'clean_data.csv')
@@ -22,162 +74,439 @@ def load_data():
 
 df = load_data()
 
+
+def pct(x):
+    if pd.isna(x):
+        return '–'
+    return str(round(x * 100)) + '%'
+
+
+def stat_card(label, value, note='', accent=False):
+    value_class = 'stat-value accent' if accent else 'stat-value'
+    return (f'<div class="stat"><div class="stat-label">{label}</div>'
+            f'<div class="{value_class}">{value}</div><div class="stat-note">{note}</div></div>')
+
+
+def stat_row(cards):
+    st.markdown('<div class="stat-grid">' + ''.join(cards) + '</div>', unsafe_allow_html=True)
+
+
+def section(eyebrow, title, lede):
+    st.markdown(f'<div class="eyebrow">{eyebrow}</div><div class="section-title">{title}</div>'
+                f'<div class="lede">{lede}</div>', unsafe_allow_html=True)
+
+
+def insight(text):
+    st.markdown(f'<div class="insight">{text}</div>', unsafe_allow_html=True)
+
+
+def style(fig, height=380, title=''):
+    # same quiet look for every chart: no background, faint grid, one font
+    fig.update_layout(
+        height=height, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(family=FONT, color=MUTED, size=13),
+        title=dict(text=title, x=0, xanchor='left', font=dict(size=16, color=INK)),
+        margin=dict(l=10, r=16, t=52 if title else 12, b=10),
+        hoverlabel=dict(bgcolor='#1C1C22', bordercolor='#2C2C33', font=dict(family=FONT, color=INK, size=13)),
+        showlegend=False, bargap=0.25)
+    fig.update_xaxes(showgrid=False, zeroline=False, linecolor='rgba(255,255,255,0.12)', ticks='', automargin=True)
+    fig.update_yaxes(gridcolor='rgba(255,255,255,0.06)', zeroline=False, ticks='', automargin=True)
+    return fig
+
+
+def show(fig):
+    st.plotly_chart(fig, theme=None, config={'displayModeBar': False})
+
+
 # ---------------- sidebar ----------------
-st.sidebar.title('🏁 F1 1950–2024')
-st.sidebar.header('About the data')
-st.sidebar.write('Every Formula 1 race result from 1950 to 2024, one row per driver per race. '
-                 'Data: [Kaggle, Rohan Rao](https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020) '
-                 '(from the Ergast API).')
+DEFAULTS = {'years': (2010, 2024), 'teams': [], 'circuit': 'All circuits'}
+for key in DEFAULTS:
+    if key not in st.session_state:
+        st.session_state[key] = DEFAULTS[key]
 
-st.sidebar.header('Filters')
-years = st.sidebar.slider('Seasons', 1950, 2024, (2010, 2024))
-df_years = df[(df['year'] >= years[0]) & (df['year'] <= years[1])]
 
-#teams with the most wins come first in the list
-team_list = df_years.groupby('team')['win'].sum().sort_values(ascending=False).index.tolist()
-teams = st.sidebar.multiselect('Constructors', team_list, placeholder='All constructors',
-                               help='Leave empty to include every constructor.')
+def reset_filters():
+    for key in DEFAULTS:
+        st.session_state[key] = DEFAULTS[key]
 
-circuit_list = ['All circuits'] + sorted(df_years['circuit_name'].unique())
-circuit = st.sidebar.selectbox('Circuit', circuit_list)
 
-filtered = df_years
+with st.sidebar:
+    st.markdown('<div class="brand">Lights <span>Out</span></div>', unsafe_allow_html=True)
+    st.markdown('<div class="side-label">About the data</div>'
+                '<div class="side-text">Every Formula 1 World Championship result from 1950 to 2024: '
+                'one row per driver per race, 26,759 rows. Source: '
+                '<a href="https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020">Kaggle, '
+                'Rohan Rao</a>, built from the Ergast API.</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="side-label">Filters</div>', unsafe_allow_html=True)
+    st.slider('Seasons', 1950, 2024, key='years')
+
+    team_options = df.groupby('team')['win'].sum().sort_values(ascending=False).index.tolist()
+    st.multiselect('Constructors', team_options, key='teams', placeholder='All constructors')
+
+    circuit_options = ['All circuits'] + sorted(df['circuit_name'].unique())
+    st.selectbox('Circuit', circuit_options, key='circuit')
+
+    st.button('Reset filters', on_click=reset_filters, width='stretch')
+
+years = st.session_state['years']
+teams = st.session_state['teams']
+circuit = st.session_state['circuit']
+
+f = df[(df['year'] >= years[0]) & (df['year'] <= years[1])]
 if len(teams) > 0:
-    filtered = filtered[filtered['team'].isin(teams)]
+    f = f[f['team'].isin(teams)]
 if circuit != 'All circuits':
-    filtered = filtered[filtered['circuit_name'] == circuit]
+    f = f[f['circuit_name'] == circuit]
 
-st.sidebar.caption(str(len(filtered)) + ' rows match the filters.')
+with st.sidebar:
+    st.markdown(f'<div class="side-label">Selection</div><div class="side-text">{f["raceId"].nunique():,} races · '
+                f'{len(f):,} entries</div>', unsafe_allow_html=True)
 
-# ---------------- title + KPIs ----------------
-st.title('Is the race decided on Saturday?')
-st.write('How much does qualifying decide the result in Formula 1? Use the filters on the left.')
-
-if len(filtered) == 0:
-    st.warning('No rows match these filters. Try a wider season range or fewer filters.')
+if len(f) == 0:
+    st.markdown('<div class="hero-title">No races match.</div>'
+                '<div class="hero-sub">Try a wider season range, or clear the constructor and circuit filters.</div>',
+                unsafe_allow_html=True)
     st.stop()
 
-wins = filtered[filtered['win'] == True]
-starters = filtered[filtered['starter'] == True]
+wins = f[f['win']]
+starters = f[f['starter']]
+finishers = f[f['finished'] & f['grid_clean'].notna()]
 
-col1, col2, col3, col4 = st.columns(4)
-col1.metric('Races', filtered['raceId'].nunique())
-if len(wins) > 0:
-    col2.metric('Pole → win', str(round((wins['grid_clean'] == 1).mean() * 100)) + '%',
-                help='Share of race wins that started from pole position.')
-    col3.metric('Front row → win', str(round((wins['grid_clean'] <= 2).mean() * 100)) + '%',
-                help='Share of race wins that started from P1 or P2.')
+# the same numbers over every season and team, to compare against
+all_wins = df[df['win']]
+all_fin = df[df['finished'] & df['grid_clean'].notna()]
+base = {
+    'pole': (all_wins['grid_clean'] == 1).mean(),
+    'front': (all_wins['grid_clean'] <= 2).mean(),
+    'within3': ((all_fin['grid_clean'] - all_fin['positionOrder']).abs() <= 3).mean(),
+    'dnf': df[df['starter']]['dnf'].mean(),
+}
+
+
+def versus(value, key):
+    if pd.isna(value) or (years == (1950, 2024) and not teams and circuit == 'All circuits'):
+        return 'across 1950–2024'
+    diff = round((value - base[key]) * 100)
+    if diff == 0:
+        return 'same as 1950–2024'
+    sign = '+' if diff > 0 else '−'
+    return f'{sign}{abs(diff)} pts vs 1950–2024'
+
+
+# ---------------- hero ----------------
+pole_win = (wins['grid_clean'] == 1).mean() if len(wins) else np.nan
+front_win = (wins['grid_clean'] <= 2).mean() if len(wins) else np.nan
+within3 = ((finishers['grid_clean'] - finishers['positionOrder']).abs() <= 3).mean() if len(finishers) else np.nan
+dnf_rate = starters['dnf'].mean() if len(starters) else np.nan
+
+if pd.isna(front_win):
+    answer = 'Not enough wins in this selection to say.'
+elif front_win >= 0.6:
+    answer = 'Mostly, yes.'
+elif front_win >= 0.4:
+    answer = 'Partly.'
 else:
-    col2.metric('Pole → win', 'n/a')
-    col3.metric('Front row → win', 'n/a')
-col4.metric('DNF rate', str(round(starters['dnf'].mean() * 100)) + '%',
-            help='Share of starters who did not finish.')
+    answer = 'Not really.'
 
-# ---------------- charts ----------------
-col1, col2 = st.columns(2)
+span = f'{years[0]}' if years[0] == years[1] else f'{years[0]}–{years[1]}'
+scope = []
+if teams:
+    scope.append(', '.join(teams) if len(teams) <= 3 else f'{len(teams)} constructors')
+if circuit != 'All circuits':
+    scope.append(circuit)
+scope_text = ' · '.join([span] + scope)
 
-#grid vs finish scatter with a trend line
-finishers = filtered[(filtered['finished'] == True) & (filtered['grid_clean'].notna())].copy()
-finishers['grid_jitter'] = finishers['grid_clean'] + np.random.uniform(-0.3, 0.3, len(finishers))
-finishers['finish_jitter'] = finishers['positionOrder'] + np.random.uniform(-0.3, 0.3, len(finishers))
+st.markdown(f'<div class="eyebrow">Formula 1 · {scope_text}</div>'
+            '<div class="hero-title">Is the race decided<br>on Saturday?</div>'
+            f'<div class="hero-answer">{answer}</div>', unsafe_allow_html=True)
+if not pd.isna(front_win):
+    st.markdown(f'<div class="hero-sub">In this selection, <b style="color:{INK}">{pct(pole_win)}</b> of wins came from pole '
+                f'and <b style="color:{INK}">{pct(front_win)}</b> from the front row. Sunday mostly shuffles drivers '
+                f'by a few places.</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="hero-meta">{f["raceId"].nunique():,} races · {f["driverId"].nunique():,} drivers · '
+            f'{f["constructorId"].nunique():,} constructors</div>', unsafe_allow_html=True)
 
-title = 'Grid vs finish'
-if finishers['grid_clean'].nunique() > 1:
-    title = 'Grid vs finish (r = ' + str(round(finishers['grid_clean'].corr(finishers['positionOrder']), 2)) + ')'
+stat_row([
+    stat_card('Won from pole', pct(pole_win), versus(pole_win, 'pole'), accent=True),
+    stat_card('Won from the front row', pct(front_win), versus(front_win, 'front')),
+    stat_card('Finish within 3 places of grid', pct(within3), versus(within3, 'within3')),
+    stat_card('DNF rate among starters', pct(dnf_rate), versus(dnf_rate, 'dnf')),
+])
 
-fig = px.scatter(finishers, x='grid_jitter', y='finish_jitter', opacity=0.45, title=title,
-                 hover_data=['driver', 'race_name', 'year', 'grid', 'positionOrder'],
-                 labels={'grid_jitter': 'Grid position', 'finish_jitter': 'Finishing position'})
-fig.update_traces(marker=dict(color='grey', size=4))
-if finishers['grid_clean'].nunique() > 1:
-    slope, intercept = np.polyfit(finishers['grid_clean'], finishers['positionOrder'], 1)
-    x_line = [finishers['grid_clean'].min(), finishers['grid_clean'].max()]
-    y_line = [intercept + slope * x_line[0], intercept + slope * x_line[1]]
-    fig.add_scatter(x=x_line, y=y_line, mode='lines', line=dict(color=red, width=4), name='trend')
-fig.update_yaxes(autorange='reversed')
-fig.update_layout(template='plotly_dark', showlegend=False)
-col1.plotly_chart(fig)
+tab_q, tab_d, tab_r, tab_driver, tab_p, tab_data = st.tabs(
+    ['Qualifying', 'Dominance', 'Reliability', 'Drivers', 'Predict', 'Data'])
 
-#wins by team
-team_wins = wins['team'].value_counts().head(10).sort_values()
-colors = ['grey'] * len(team_wins)
-if len(team_wins) > 0:
-    colors[-1] = red
-fig = px.bar(x=team_wins.values, y=team_wins.index, orientation='h', text=team_wins.values,
-             title='Wins by team (top 10)', labels={'x': 'Race wins', 'y': ''})
-fig.update_traces(marker_color=colors)
-fig.update_layout(template='plotly_dark')
-col2.plotly_chart(fig)
+# ---------------- qualifying ----------------
+with tab_q:
+    grid_starts = starters[starters['grid_clean'].between(1, 20)]
+    p1 = grid_starts[grid_starts['grid_clean'] == 1]['podium'].mean()
+    p5 = grid_starts[grid_starts['grid_clean'] == 5]['podium'].mean()
+    section('Sector 1 · Qualifying', 'The grid sets the order.',
+            f'From pole, a driver reached the podium <b>{pct(p1)}</b> of the time. From fifth it falls to '
+            f'<b>{pct(p5)}</b>. Pick an outcome to see how fast the chance drops.')
 
-col1, col2 = st.columns(2)
+    outcome = st.segmented_control('Outcome', ['Win', 'Podium', 'Points'], default='Podium', key='outcome',
+                                   label_visibility='collapsed')
+    if outcome is None:
+        outcome = 'Podium'
+    if outcome == 'Win':
+        hit = grid_starts['win']
+    elif outcome == 'Podium':
+        hit = grid_starts['podium']
+    else:
+        hit = grid_starts['points'] > 0
+    rate = hit.groupby(grid_starts['grid_clean']).agg(['mean', 'size']).reindex(range(1, 21))
 
-#DNF rate per season
-dnf_year = starters.groupby('year')['dnf'].mean() * 100
-mech_year = starters.groupby('year')['dnf_type'].apply(lambda x: (x == 'Mechanical').mean()) * 100
-dnf_df = pd.DataFrame({'All DNFs': dnf_year, 'Mechanical only': mech_year})
+    fig = go.Figure(go.Bar(
+        x=[f'P{i}' for i in range(1, 21)], y=rate['mean'] * 100, customdata=rate['size'],
+        marker=dict(color=[RED] + [GREY] * 19, cornerradius=4),
+        hovertemplate='From %{x}: %{y:.0f}% ' + outcome.lower() + ' rate<br>%{customdata} starts<extra></extra>'))
+    fig.update_yaxes(ticksuffix='%', rangemode='tozero')
+    show(style(fig, 340, f'{outcome} rate by grid slot'))
 
-fig = px.line(dnf_df, markers=True, title='DNF rate among starters',
-              labels={'year': 'Season', 'value': '% of starters', 'variable': ''},
-              color_discrete_sequence=[red, 'white'])
-fig.update_layout(template='plotly_dark', legend=dict(orientation='h', y=-0.25))
-col1.plotly_chart(fig)
+    col1, col2 = st.columns([1.35, 1], gap='large')
+    with col1:
+        g = grid_starts.copy()
+        g['result'] = np.where(g['finished'], g['positionOrder'].clip(upper=21), 22)
+        table = pd.crosstab(g['grid_clean'].astype(int), g['result']).reindex(
+            index=range(1, 21), columns=range(1, 23), fill_value=0)
+        share = table.div(table.sum(axis=1).replace(0, np.nan), axis=0) * 100
+        share = share.drop(columns=21)  # finishing 21st or lower is rare, so it is left out of the picture
+        x_labels = [str(i) for i in range(1, 21)] + ['DNF']
+        fig = go.Figure(go.Heatmap(
+            z=share.values, x=x_labels, y=[f'P{i}' for i in range(1, 21)], zmin=0, zmax=50, xgap=1, ygap=1,
+            colorscale=[[0, '#111115'], [0.25, '#4A1510'], [0.6, RED], [1, '#FFD7D0']],
+            colorbar=dict(thickness=8, outlinewidth=0, ticksuffix='%', len=0.8),
+            hovertemplate='Started %{y}, finished %{x}<br>%{z:.0f}% of starts<extra></extra>'))
+        fig.update_yaxes(autorange='reversed', title='Grid slot', gridcolor='rgba(0,0,0,0)')
+        fig.update_xaxes(title='Result', type='category', tickangle=0, tickfont=dict(size=10))
+        show(style(fig, 470, 'Where each grid slot finishes'))
+    with col2:
+        gained = (finishers['grid_clean'] - finishers['positionOrder']).clip(-15, 15)
+        counts = gained.value_counts().reindex(range(-15, 16), fill_value=0)
+        fig = go.Figure(go.Bar(
+            x=counts.index, y=counts.values,
+            marker=dict(color=[RED if abs(i) <= 3 else GREY for i in counts.index], cornerradius=3),
+            hovertemplate='%{x:+d} places: %{y} finishes<extra></extra>'))
+        fig.update_xaxes(title='Places gained (+) or lost (−)', dtick=5)
+        show(style(fig, 470, 'Places gained on Sunday'))
 
-#podium rate by grid slot
-top10_grid = filtered[(filtered['grid_clean'] >= 1) & (filtered['grid_clean'] <= 10)]
-podium_rate = top10_grid.groupby('grid_clean')['podium'].mean() * 100
-podium_rate = podium_rate.reindex(range(1, 11)).fillna(0)
+    insight(f'<b>{pct(within3)}</b> of classified finishers end within three places of where they started (red bars). '
+            f'The bright diagonal in the heatmap is the same story: Saturday sets the order and Sunday tweaks it.')
 
-fig = px.bar(x=['P' + str(i) for i in range(1, 11)], y=podium_rate.values,
-             text=[str(round(v)) + '%' for v in podium_rate],
-             title='Podium rate by grid slot', labels={'x': 'Grid slot', 'y': 'Podium rate (%)'})
-fig.update_traces(marker_color=[red] + ['grey'] * 9, textposition='outside')
-fig.update_layout(template='plotly_dark', yaxis_range=[0, 105])
-col2.plotly_chart(fig)
+# ---------------- dominance ----------------
+with tab_d:
+    if len(wins) == 0:
+        section('Sector 2 · Dominance', 'No wins in this selection.', 'Widen the filters to compare constructors.')
+    else:
+        season = wins.groupby(['year', 'team']).size().reset_index(name='wins')
+        totals = wins.groupby('year').size()
+        leaders = season.sort_values('wins', ascending=False).drop_duplicates('year').set_index('year').sort_index()
+        leaders['share'] = leaders['wins'] / totals * 100
+        top_team = wins['team'].value_counts().index[0]
+        top_seasons = (leaders['team'] == top_team).sum()
 
-# ---------------- insights ----------------
-st.subheader('Insights (2010–2024, all teams)')
-st.markdown('''
-- **Qualifying matters most.** The pole sitter won 51% of races and the front row won 77%. Only 4 of 305 races were won from outside the top 10.
-- **Grid predicts the finish.** For classified finishers r = 0.78, and two in three finish within 3 places of where they started.
-- **One team rules each era.** Mercedes won 102 of 138 races from 2014 to 2020, and Red Bull won 21 of 22 in 2023.
-- **Cars are far more reliable.** About half of all starters retired until the 1980s. In the 2020s it is 14%.
-''')
+        section('Sector 2 · Dominance', 'Every era has an owner.',
+                f'<b>{top_team}</b> won the most races in this selection and led <b>{top_seasons}</b> of '
+                f'{len(leaders)} seasons. Each bar is the leading team\'s share of that season\'s wins.')
 
+        fig = go.Figure(go.Bar(
+            x=leaders.index, y=leaders['share'], customdata=np.stack([leaders['team'], leaders['wins'],
+                                                                      totals.reindex(leaders.index)], axis=1),
+            marker=dict(color=[RED if t == top_team else GREY for t in leaders['team']], cornerradius=3),
+            hovertemplate='%{x}: %{customdata[0]}<br>%{customdata[1]} of %{customdata[2]} wins (%{y:.0f}%)<extra></extra>'))
+        fig.update_yaxes(ticksuffix='%', range=[0, 100])
+        show(style(fig, 340, f'Leading team\'s share of wins per season · red = {top_team}'))
 
-# ---------------- predict podium chance ----------------
-#same model as the notebook: podium from grid, team and year (2010-2024)
+        col1, col2 = st.columns([1, 1.1], gap='large')
+        with col1:
+            team_wins = wins['team'].value_counts().head(10).sort_values()
+            fig = go.Figure(go.Bar(
+                x=team_wins.values, y=team_wins.index, orientation='h', text=team_wins.values,
+                textposition='outside', cliponaxis=False,
+                marker=dict(color=[GREY] * (len(team_wins) - 1) + [RED], cornerradius=3),
+                hovertemplate='%{y}: %{x} wins<extra></extra>'))
+            fig.update_xaxes(showticklabels=False)
+            fig.update_yaxes(showgrid=False)
+            fig.update_traces(textfont=dict(color=MUTED))
+            show(style(fig, 400, 'Most race wins'))
+        with col2:
+            eras = [('1950s', 1950, 1959), ('1960s', 1960, 1969), ('1970s', 1970, 1979), ('1980s', 1980, 1989),
+                    ('1990s', 1990, 1999), ('2000s', 2000, 2009), ('2010–13', 2010, 2013),
+                    ('2014–20', 2014, 2020), ('2021–24', 2021, 2024)]
+            rows = []
+            for name, start, end in eras:
+                era_wins = wins[(wins['year'] >= start) & (wins['year'] <= end)]
+                if len(era_wins) == 0:
+                    continue
+                counts = era_wins['team'].value_counts()
+                rows.append({'Era': name, 'Top team': counts.index[0], 'Wins': f'{counts.iloc[0]} of {counts.sum()}',
+                             'Share': counts.iloc[0] / counts.sum() * 100})
+            st.markdown(f'<div style="color:{INK};font-size:16px;margin:4px 0 12px 0">Top team by era</div>',
+                        unsafe_allow_html=True)
+            st.dataframe(pd.DataFrame(rows), hide_index=True, height=35 * (len(rows) + 1) + 3,
+                         column_config={'Share': st.column_config.ProgressColumn(
+                             'Share of wins', format='%.0f%%', min_value=0, max_value=100)})
+
+        best = leaders['share'].idxmax()
+        insight(f'The most one-sided season here is <b>{best}</b>: {leaders.loc[best, "team"]} won '
+                f'{leaders.loc[best, "wins"]} of {totals[best]} races. Better reliability means the fastest car '
+                f'almost always reaches the flag, so dominance has grown in the modern era.')
+
+# ---------------- reliability ----------------
+with tab_r:
+    by_year = starters.groupby('year').agg(dnf=('dnf', 'mean'),
+                                           mech=('dnf_type', lambda s: (s == 'Mechanical').mean())) * 100
+    first, last = by_year.index.min(), by_year.index.max()
+    section('Sector 3 · Reliability', 'Cars stopped breaking.',
+            f'In {first}, <b>{by_year.loc[first, "dnf"]:.0f}%</b> of starters failed to finish. By {last} it was '
+            f'<b>{by_year.loc[last, "dnf"]:.0f}%</b>. Widen the season range to 1950 to see the full change.')
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=by_year.index, y=by_year['dnf'], mode='lines', name='All DNFs',
+                             line=dict(color=RED, width=2.5), hovertemplate='%{x}: %{y:.0f}% of starters<extra>All DNFs</extra>'))
+    fig.add_trace(go.Scatter(x=by_year.index, y=by_year['mech'], mode='lines', name='Mechanical',
+                             line=dict(color=INK, width=2), hovertemplate='%{x}: %{y:.0f}% of starters<extra>Mechanical</extra>'))
+    fig.add_annotation(x=last, y=by_year.loc[last, 'dnf'], text='All DNFs', showarrow=False, xanchor='left',
+                       xshift=8, font=dict(color=RED))
+    fig.add_annotation(x=last, y=by_year.loc[last, 'mech'], text='Mechanical', showarrow=False, xanchor='left',
+                       xshift=8, font=dict(color=INK))
+    fig.update_yaxes(ticksuffix='%', rangemode='tozero')
+    fig.update_xaxes(range=[first - 0.5, last + 0.5])
+    fig.update_layout(hovermode='x unified')
+    fig = style(fig, 360, 'Share of starters who did not finish')
+    fig.update_layout(margin=dict(r=96))
+    show(fig)
+
+    causes = starters[starters['dnf']].groupby('decade')['dnf_type'].value_counts(normalize=True).unstack().fillna(0) * 100
+    fig = go.Figure()
+    for cause, color in [('Mechanical', RED), ('Crash/collision', '#8E8E93'), ('Other', GREY)]:
+        if cause in causes.columns:
+            fig.add_trace(go.Bar(x=[f'{d}s' for d in causes.index], y=causes[cause], name=cause,
+                                 marker=dict(color=color), hovertemplate='%{x}: %{y:.0f}% ' + cause.lower() + '<extra></extra>'))
+    fig.update_layout(barmode='stack', showlegend=True)
+    fig.update_traces(width=0.35 if len(causes) <= 3 else None)
+    fig.update_yaxes(ticksuffix='%', range=[0, 100])
+    fig = style(fig, 340, 'What ended the race, by decade')
+    fig.update_layout(showlegend=True, legend=dict(orientation='h', y=1.02, x=1, xanchor='right', yanchor='bottom',
+                                                   font=dict(color=MUTED)))
+    show(fig)
+
+    mech_now = causes['Mechanical'].iloc[-1] if 'Mechanical' in causes.columns else np.nan
+    insight(f'Mechanical failures still cause <b>{mech_now:.0f}%</b> of retirements in the {causes.index[-1]}s, '
+            f'but far fewer cars retire at all. Status labels changed over the decades, so treat the split as approximate.')
+
+# ---------------- drivers ----------------
+with tab_driver:
+    driver_options = f[f['starter']].groupby('driver')['win'].sum().sort_values(ascending=False).index.tolist()
+    if len(driver_options) == 0:
+        section('Driver', 'No drivers in this selection.', 'Widen the filters.')
+    else:
+        pick, _ = st.columns([1, 2])
+        driver = pick.selectbox('Driver', driver_options, key='driver', help='Sorted by wins in the current selection.')
+        d = f[f['driver'] == driver]
+        d_start = d[d['starter']]
+        d_fin = d[d['finished'] & d['grid_clean'].notna()]
+        team_list = d['team'].value_counts().index.tolist()
+        section('Driver', driver,
+                f'{d["year"].min()}–{d["year"].max()} · ' + ', '.join(team_list[:3]) +
+                (f' and {len(team_list) - 3} more' if len(team_list) > 3 else ''))
+
+        gain = (d_fin['grid_clean'] - d_fin['positionOrder']).mean() if len(d_fin) else np.nan
+        poles = d[d['grid_clean'] == 1]
+        stat_row([
+            stat_card('Starts', f'{len(d_start):,}'),
+            stat_card('Wins', f'{int(d["win"].sum())}', pct(d['win'].sum() / len(d_start)) + ' of starts' if len(d_start) else '', accent=True),
+            stat_card('Podiums', f'{int(d["podium"].sum())}'),
+            stat_card('Pole starts', f'{len(poles)}'),
+            stat_card('Places gained', '–' if pd.isna(gain) else f'{gain:+.1f}', 'avg per classified finish'),
+        ])
+
+        if len(poles) > 0:
+            insight(f'{driver} turned <b>{pct(poles["win"].mean())}</b> of pole starts into wins here. '
+                    f'Across all drivers in this selection the figure is {pct(starters[starters["grid_clean"] == 1]["win"].mean())}.')
+
+        per_year = d.groupby('year').agg(wins=('win', 'sum'), podiums=('podium', 'sum'))
+        fig = go.Figure()
+        fig.add_trace(go.Bar(x=per_year.index, y=per_year['wins'], name='Wins', marker=dict(color=RED),
+                             hovertemplate='%{x}: %{y} wins<extra></extra>'))
+        fig.add_trace(go.Bar(x=per_year.index, y=per_year['podiums'] - per_year['wins'], name='Other podiums',
+                             marker=dict(color=GREY), hovertemplate='%{x}: %{y} other podiums<extra></extra>'))
+        fig.update_layout(barmode='stack')
+        fig = style(fig, 340, 'Podiums per season · red = wins')
+        show(fig)
+
+# ---------------- predict ----------------
 @st.cache_resource
 def train_model():
-    model_df = df[(df['year'] >= 2010) & (df['starter'] == True) & (df['grid_clean'].notna())].copy()
+    # same model as the notebook: podium from grid, team and year, trained on 2010-2024
+    model_df = df[(df['year'] >= 2010) & df['starter'] & df['grid_clean'].notna()].copy()
     top_teams = model_df.groupby('team')['points'].sum().sort_values(ascending=False).head(6).index.tolist()
-    model_df['team_group'] = model_df['team']
-    model_df.loc[~model_df['team'].isin(top_teams), 'team_group'] = 'Other'
-
+    model_df['team_group'] = model_df['team'].where(model_df['team'].isin(top_teams), 'Other')
     X = pd.get_dummies(model_df[['grid_clean', 'team_group', 'year']])
-    y = model_df['podium']
     model = LogisticRegression(max_iter=1000)
-    model.fit(X, y)
-    return model, top_teams, X.columns
+    model.fit(X, model_df['podium'])
+    observed = model_df.groupby('grid_clean')['podium'].mean()
+    return model, top_teams, X.columns, observed
 
 
-model, top_teams, model_columns = train_model()
+@st.fragment
+def predictor():
+    model, top_teams, model_columns, observed = train_model()
+    section('Predict', 'What are the odds from here?',
+            'A logistic regression trained on every 2010–2024 start. Choose a grid slot, a team and a season.')
 
-st.subheader('Predict podium chance')
-col1, col2, col3, col4 = st.columns(4)
-grid_in = col1.slider('Grid slot', 1, 20, 3)
-team_in = col2.selectbox('Team', top_teams + ['Other'])
-year_in = col3.slider('Season', 2010, 2024, 2024)
+    col1, col2 = st.columns([1, 1.4], gap='large')
+    with col1:
+        grid_in = st.slider('Grid slot', 1, 20, 3, key='p_grid')
+        team_in = st.selectbox('Team', top_teams + ['Other'], key='p_team', help='Teams outside the top six are grouped as Other.')
+        year_in = st.slider('Season', 2010, 2024, 2024, key='p_year')
 
-new_row = pd.DataFrame({'grid_clean': [grid_in], 'team_group': [team_in], 'year': [year_in]})
-new_row = pd.get_dummies(new_row).reindex(columns=model_columns, fill_value=0)
-chance = model.predict_proba(new_row)[0, 1]
-col4.metric('Podium chance', str(round(chance * 100)) + '%')
-st.caption('Logistic regression trained on 2010–2024 starters (grid, team, year). '
-           'It is a simple model, so treat the number as a rough guide.')
+    rows = pd.DataFrame({'grid_clean': range(1, 21), 'team_group': team_in, 'year': year_in})
+    rows = pd.get_dummies(rows).reindex(columns=model_columns, fill_value=0)
+    curve = model.predict_proba(rows)[:, 1] * 100
+    chance = curve[grid_in - 1]
+
+    with col2:
+        st.markdown(f'<div class="stat-label" style="color:{MUTED};font-size:15px">Podium chance</div>'
+                    f'<div class="big-prob">{chance:.0f}<span>%</span></div>'
+                    f'<div class="note" style="margin-top:12px">Starting P{grid_in} for {team_in} in {year_in}. '
+                    f'Across all teams, P{grid_in} reached the podium {observed.get(grid_in, np.nan) * 100:.0f}% '
+                    f'of the time.</div>', unsafe_allow_html=True)
+
+    fig = go.Figure(go.Bar(
+        x=[f'P{i}' for i in range(1, 21)], y=curve,
+        marker=dict(color=[RED if i == grid_in else GREY for i in range(1, 21)], cornerradius=4),
+        hovertemplate='From %{x}: %{y:.0f}%<extra></extra>'))
+    fig.update_yaxes(ticksuffix='%', range=[0, 100])
+    show(style(fig, 300, f'Predicted podium chance by grid slot · {team_in}, {year_in}'))
+    st.markdown('<div class="note">Precision 0.71 · recall 0.53 · ROC-AUC 0.92 on a held-out 20% test set. '
+                'A rough guide, not a forecast: it knows nothing about weather, strategy or upgrades.</div>',
+                unsafe_allow_html=True)
+
+
+with tab_p:
+    predictor()
 
 # ---------------- data ----------------
-st.subheader('Data preview')
-st.dataframe(filtered.head(100), hide_index=True)
+with tab_data:
+    section('Data', 'The rows behind every chart.',
+            f'{len(f):,} entries match the filters. The preview shows the first 100.')
+    view_cols = ['year', 'round', 'race_name', 'circuit_name', 'driver', 'team', 'grid', 'positionOrder',
+                 'points', 'laps', 'status', 'finished']
+    st.dataframe(f[view_cols].head(100), hide_index=True, height=420, column_config={
+        'year': st.column_config.NumberColumn('Season', format='%d'),
+        'round': 'Round', 'race_name': 'Race', 'circuit_name': 'Circuit', 'driver': 'Driver', 'team': 'Team',
+        'grid': 'Grid', 'positionOrder': 'Finish', 'points': 'Points', 'laps': 'Laps', 'status': 'Status',
+        'finished': st.column_config.CheckboxColumn('Classified')})
 
-st.subheader('Summary statistics')
-st.dataframe(filtered[['grid_clean', 'positionOrder', 'points', 'laps', 'fastest_lap_sec', 'fastestLapSpeed']].describe().round(2))
+    st.markdown(f'<div style="color:{INK};font-size:16px;margin:26px 0 10px 0">Summary statistics</div>',
+                unsafe_allow_html=True)
+    num_cols = ['grid_clean', 'positionOrder', 'points', 'laps', 'fastest_lap_sec', 'fastestLapSpeed']
+    st.dataframe(f[num_cols].describe().round(2), column_config={
+        'grid_clean': 'Grid', 'positionOrder': 'Finish', 'points': 'Points', 'laps': 'Laps',
+        'fastest_lap_sec': 'Fastest lap (s)', 'fastestLapSpeed': 'Fastest lap (km/h)'})
+
+    st.download_button('Download these rows as CSV', f.to_csv(index=False).encode('utf-8'),
+                       file_name='f1_filtered.csv', mime='text/csv')

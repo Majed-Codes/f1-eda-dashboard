@@ -1,7 +1,19 @@
 [theme]
 base = "dark"
 primaryColor = "#FF2B17"
-backgroundColor = "#15151E"
-secondaryBackgroundColor = "#1F1F2B"
-textColor = "#F0F0F5"
-font = "sans serif"
+backgroundColor = "#0A0A0C"
+secondaryBackgroundColor = "#16161B"
+textColor = "#F5F5F7"
+linkColor = "#FF6A5C"
+font = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif"
+headingFont = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
+baseRadius = "12px"
+borderColor = "#26262C"
+showWidgetBorder = true
+
+[theme.sidebar]
+backgroundColor = "#0F0F12"
+secondaryBackgroundColor = "#1A1A20"
+
+[client]
+toolbarMode = "minimal"
