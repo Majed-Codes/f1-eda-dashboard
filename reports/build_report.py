@@ -133,7 +133,7 @@ story += [Spacer(1, 4.2 * cm),
           p("Is the Race Decided on Saturday?", white),
           p("An exploratory data analysis of Formula 1, 1950 to 2024", sub),
           Spacer(1, 7 * cm),
-          p("<b>Majed Alotaibi</b><br/>AI undergraduate, Tuwaiq Academy<br/>Unit 3 Final Project<br/>"
+          p("<b>Majed Alotaibi</b><br/>Tuwaiq Academy<br/>Unit 3 Final Project<br/>"
             f"{date.today():%B %Y}", sub),
           NextPageTemplate("body"), PageBreak()]
 
