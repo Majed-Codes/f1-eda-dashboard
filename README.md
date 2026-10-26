@@ -1,6 +1,6 @@
 # Is the race decided on Saturday?
 
-Unit 3 final project, Majed Alotaibi, Tuwaiq Academy.
+Unit 3 final project
 
 - Dashboard: https://f1-eda-dashboard-q4ra9nh4rp59mufhrbpm4r.streamlit.app
 - Presentation: https://majed-codes.github.io/f1-eda-dashboard/presentation/
