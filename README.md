@@ -48,8 +48,8 @@ Tested with Python 3.11.
 jupyter notebook notebook/f1_eda.ipynb
 ```
 
-Run all cells from top to bottom. The notebook reads `data/raw/`, writes `data/clean_data.csv`
-(plus a copy in `app/`), and saves every plot to `reports/figures/`.
+Run all cells from top to bottom. The notebook reads `data/raw/` and writes `data/clean_data.csv`
+(plus a copy in `app/`). The styled plots used in the PDF report are in `reports/figures/`.
 
 ## Run the dashboard
 
