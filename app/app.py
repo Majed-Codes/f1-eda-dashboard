@@ -1,205 +1,183 @@
-"""F1 EDA dashboard: is the race decided on Saturday?
-
-Run from the repo root with:  streamlit run app/app.py
-"""
-from pathlib import Path
+import os
 
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
+import plotly.express as px
 import streamlit as st
 from sklearn.linear_model import LogisticRegression
 
-RED = "#FF2B17"
-GREY = "#5C5C66"
-LIGHT = "#C8C8D0"
-BG = "#15151E"
+#run it with: streamlit run app/app.py
 
-DATA = Path(__file__).parent / "clean_data.csv"
+st.set_page_config(page_title='F1 EDA Dashboard', page_icon='🏁', layout='wide')
 
-st.set_page_config(page_title="F1 EDA Dashboard", page_icon="🏁", layout="wide")
+red = '#FF2B17'
 
 
+#load the data once so the app doesnt read the csv every time a filter changes
 @st.cache_data
 def load_data():
-    df = pd.read_csv(DATA)
-    for col in ["finished", "starter", "dnf", "podium", "win"]:
-        df[col] = df[col].astype(bool)
-    return df
-
-
-@st.cache_resource
-def train_podium_model(df):
-    """Same logistic regression as the notebook: podium from grid, team and year, 2010-2024."""
-    data = df[df["year"].between(2010, 2024) & df["starter"] & df["grid_clean"].notna()].copy()
-    top_teams = data.groupby("team")["points"].sum().sort_values(ascending=False).head(6).index.tolist()
-    data["team_group"] = data["team"]
-    data.loc[~data["team"].isin(top_teams), "team_group"] = "Other"
-
-    X = pd.get_dummies(data[["grid_clean", "team_group", "year"]])
-    model = LogisticRegression(max_iter=1000)
-    model.fit(X, data["podium"])
-    return model, top_teams, X.columns
-
-
-def style(fig, height=380):
-    """Shared dark look for every Plotly chart."""
-    fig.update_layout(template="plotly_dark", paper_bgcolor=BG, plot_bgcolor=BG, height=height,
-                      margin=dict(l=10, r=10, t=50, b=10), font=dict(color=LIGHT),
-                      hoverlabel=dict(bgcolor="#24242E"))
-    fig.update_xaxes(gridcolor="#2E2E38", zeroline=False)
-    fig.update_yaxes(gridcolor="#2E2E38", zeroline=False)
-    return fig
+    path = os.path.join(os.path.dirname(__file__), 'clean_data.csv')
+    return pd.read_csv(path)
 
 
 df = load_data()
 
-# ------------------------------------------------------------------ sidebar
-st.sidebar.title("🏁 F1 1950–2024")
-st.sidebar.header("About the data")
-st.sidebar.markdown(
-    "Every Formula 1 World Championship race result from 1950 to 2024, one row per driver per race. "
-    "Data: [Kaggle, Rohan Rao](https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020) "
-    "(from the Ergast API)."
-)
+# ---------------- sidebar ----------------
+st.sidebar.title('🏁 F1 1950–2024')
+st.sidebar.header('About the data')
+st.sidebar.write('Every Formula 1 race result from 1950 to 2024, one row per driver per race. '
+                 'Data: [Kaggle, Rohan Rao](https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020) '
+                 '(from the Ergast API).')
 
-st.sidebar.header("Filters")
-years = st.sidebar.slider("Seasons", 1950, 2024, (2010, 2024))
-in_years = df[df["year"].between(*years)]
+st.sidebar.header('Filters')
+years = st.sidebar.slider('Seasons', 1950, 2024, (2010, 2024))
+df_years = df[(df['year'] >= years[0]) & (df['year'] <= years[1])]
 
-# teams sorted by wins in the chosen seasons, so the big names come first
-team_options = in_years.groupby("team")["win"].sum().sort_values(ascending=False).index.tolist()
-teams = st.sidebar.multiselect("Constructors", team_options, placeholder="All constructors",
-                               help="Leave empty to include every constructor.")
+#teams with the most wins come first in the list
+team_list = df_years.groupby('team')['win'].sum().sort_values(ascending=False).index.tolist()
+teams = st.sidebar.multiselect('Constructors', team_list, placeholder='All constructors',
+                               help='Leave empty to include every constructor.')
 
-circuit_options = ["All circuits"] + sorted(in_years["circuit_name"].dropna().unique())
-circuit = st.sidebar.selectbox("Circuit", circuit_options)
+circuit_list = ['All circuits'] + sorted(df_years['circuit_name'].unique())
+circuit = st.sidebar.selectbox('Circuit', circuit_list)
 
-f = in_years
-if teams:
-    f = f[f["team"].isin(teams)]
-if circuit != "All circuits":
-    f = f[f["circuit_name"] == circuit]
+filtered = df_years
+if len(teams) > 0:
+    filtered = filtered[filtered['team'].isin(teams)]
+if circuit != 'All circuits':
+    filtered = filtered[filtered['circuit_name'] == circuit]
 
-st.sidebar.caption(f"{len(f):,} rows match the filters.")
+st.sidebar.caption(str(len(filtered)) + ' rows match the filters.')
 
-# ------------------------------------------------------------------ header + KPIs
-st.title("Is the race decided on Saturday?")
-st.markdown("How much does qualifying decide the result in Formula 1? Use the filters on the left.")
+# ---------------- title + KPIs ----------------
+st.title('Is the race decided on Saturday?')
+st.write('How much does qualifying decide the result in Formula 1? Use the filters on the left.')
 
-if f.empty:
-    st.warning("No rows match these filters. Try a wider season range or fewer filters.")
+if len(filtered) == 0:
+    st.warning('No rows match these filters. Try a wider season range or fewer filters.')
     st.stop()
 
-wins = f[f["win"]]
-starters = f[f["starter"]]
-pct = lambda x: f"{x:.0%}" if pd.notna(x) else "n/a"
+wins = filtered[filtered['win'] == True]
+starters = filtered[filtered['starter'] == True]
 
-k1, k2, k3, k4 = st.columns(4)
-k1.metric("Races", f"{f['raceId'].nunique():,}")
-k2.metric("Pole → win", pct((wins["grid_clean"] == 1).mean() if len(wins) else np.nan),
-          help="Share of race wins that started from pole position.")
-k3.metric("Front row → win", pct((wins["grid_clean"] <= 2).mean() if len(wins) else np.nan),
-          help="Share of race wins that started from P1 or P2.")
-k4.metric("DNF rate", pct(starters["dnf"].mean() if len(starters) else np.nan),
-          help="Share of starters who did not finish.")
+col1, col2, col3, col4 = st.columns(4)
+col1.metric('Races', filtered['raceId'].nunique())
+if len(wins) > 0:
+    col2.metric('Pole → win', str(round((wins['grid_clean'] == 1).mean() * 100)) + '%',
+                help='Share of race wins that started from pole position.')
+    col3.metric('Front row → win', str(round((wins['grid_clean'] <= 2).mean() * 100)) + '%',
+                help='Share of race wins that started from P1 or P2.')
+else:
+    col2.metric('Pole → win', 'n/a')
+    col3.metric('Front row → win', 'n/a')
+col4.metric('DNF rate', str(round(starters['dnf'].mean() * 100)) + '%',
+            help='Share of starters who did not finish.')
 
-# ------------------------------------------------------------------ charts
-c1, c2 = st.columns(2)
+# ---------------- charts ----------------
+col1, col2 = st.columns(2)
 
-with c1:
-    fin = f[f["finished"] & f["grid_clean"].notna()]
-    fig = go.Figure()
-    if len(fin) > 1:
-        rng = np.random.default_rng(0)
-        fig.add_trace(go.Scattergl(
-            x=fin["grid_clean"] + rng.uniform(-0.3, 0.3, len(fin)),
-            y=fin["positionOrder"] + rng.uniform(-0.3, 0.3, len(fin)),
-            mode="markers", marker=dict(color=GREY, size=4, opacity=0.45),
-            customdata=fin[["driver", "race_name", "year", "grid", "positionOrder"]],
-            hovertemplate="%{customdata[0]}<br>%{customdata[2]} %{customdata[1]}"
-                          "<br>Grid %{customdata[3]} → P%{customdata[4]}<extra></extra>",
-            name="finisher"))
-        if fin["grid_clean"].nunique() > 1:
-            slope, intercept = np.polyfit(fin["grid_clean"], fin["positionOrder"], 1)
-            xs = np.array([fin["grid_clean"].min(), fin["grid_clean"].max()])
-            fig.add_trace(go.Scatter(x=xs, y=intercept + slope * xs, mode="lines",
-                                     line=dict(color=RED, width=4), name="trend", hoverinfo="skip"))
-            r = fin["grid_clean"].corr(fin["positionOrder"])
-            title = f"Grid vs finish (r = {r:.2f})"
-        else:
-            title = "Grid vs finish"
-    else:
-        title = "Grid vs finish (not enough finishers)"
-    fig.update_layout(title=title, showlegend=False, xaxis_title="Grid position", yaxis_title="Finishing position")
-    fig.update_yaxes(autorange="reversed")
-    st.plotly_chart(style(fig), theme=None)
+#grid vs finish scatter with a trend line
+finishers = filtered[(filtered['finished'] == True) & (filtered['grid_clean'].notna())].copy()
+finishers['grid_jitter'] = finishers['grid_clean'] + np.random.uniform(-0.3, 0.3, len(finishers))
+finishers['finish_jitter'] = finishers['positionOrder'] + np.random.uniform(-0.3, 0.3, len(finishers))
 
-with c2:
-    team_wins = wins["team"].value_counts().head(10).sort_values()
-    fig = go.Figure(go.Bar(
-        x=team_wins.values, y=team_wins.index, orientation="h", text=team_wins.values,
-        marker_color=[RED if t == team_wins.idxmax() else GREY for t in team_wins.index] if len(team_wins) else [],
-        hovertemplate="%{y}: %{x} wins<extra></extra>"))
-    fig.update_traces(textposition="outside", cliponaxis=False)
-    fig.update_layout(title="Wins by team (top 10)", xaxis_title="Race wins")
-    st.plotly_chart(style(fig), theme=None)
+title = 'Grid vs finish'
+if finishers['grid_clean'].nunique() > 1:
+    title = 'Grid vs finish (r = ' + str(round(finishers['grid_clean'].corr(finishers['positionOrder']), 2)) + ')'
 
-c3, c4 = st.columns(2)
+fig = px.scatter(finishers, x='grid_jitter', y='finish_jitter', opacity=0.45, title=title,
+                 hover_data=['driver', 'race_name', 'year', 'grid', 'positionOrder'],
+                 labels={'grid_jitter': 'Grid position', 'finish_jitter': 'Finishing position'})
+fig.update_traces(marker=dict(color='grey', size=4))
+if finishers['grid_clean'].nunique() > 1:
+    slope, intercept = np.polyfit(finishers['grid_clean'], finishers['positionOrder'], 1)
+    x_line = [finishers['grid_clean'].min(), finishers['grid_clean'].max()]
+    y_line = [intercept + slope * x_line[0], intercept + slope * x_line[1]]
+    fig.add_scatter(x=x_line, y=y_line, mode='lines', line=dict(color=red, width=4), name='trend')
+fig.update_yaxes(autorange='reversed')
+fig.update_layout(template='plotly_dark', showlegend=False)
+col1.plotly_chart(fig)
 
-with c3:
-    by_year = starters.groupby("year").agg(dnf=("dnf", "mean"),
-                                           mech=("dnf_type", lambda s: (s == "Mechanical").mean()))
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=by_year.index, y=by_year["dnf"] * 100, mode="lines+markers", name="All DNFs",
-                             line=dict(color=RED, width=2.5), hovertemplate="%{x}: %{y:.0f}%<extra>All DNFs</extra>"))
-    fig.add_trace(go.Scatter(x=by_year.index, y=by_year["mech"] * 100, mode="lines+markers", name="Mechanical only",
-                             line=dict(color=LIGHT, width=2), hovertemplate="%{x}: %{y:.0f}%<extra>Mechanical</extra>"))
-    fig.update_layout(title="DNF rate among starters", xaxis_title="Season", yaxis_title="% of starters",
-                      legend=dict(orientation="h", y=-0.28, x=0))
-    st.plotly_chart(style(fig), theme=None)
+#wins by team
+team_wins = wins['team'].value_counts().head(10).sort_values()
+colors = ['grey'] * len(team_wins)
+if len(team_wins) > 0:
+    colors[-1] = red
+fig = px.bar(x=team_wins.values, y=team_wins.index, orientation='h', text=team_wins.values,
+             title='Wins by team (top 10)', labels={'x': 'Race wins', 'y': ''})
+fig.update_traces(marker_color=colors)
+fig.update_layout(template='plotly_dark')
+col2.plotly_chart(fig)
 
-with c4:
-    top10 = f[f["grid_clean"].between(1, 10)]
-    rate = top10.groupby("grid_clean")["podium"].agg(["mean", "size"]).reindex(range(1, 11))
-    fig = go.Figure(go.Bar(
-        x=[f"P{g}" for g in rate.index], y=rate["mean"] * 100,
-        marker_color=[RED] + [GREY] * 9, customdata=rate["size"],
-        text=[f"{v:.0%}" if pd.notna(v) else "" for v in rate["mean"]], textposition="outside", cliponaxis=False,
-        hovertemplate="%{x}: %{y:.0f}% podium<br>%{customdata} starts<extra></extra>"))
-    fig.update_layout(title="Podium rate by grid slot", xaxis_title="Grid slot", yaxis_title="Podium rate (%)",
-                      yaxis_range=[0, 105])
-    st.plotly_chart(style(fig), theme=None)
+col1, col2 = st.columns(2)
 
-# ------------------------------------------------------------------ insights
-st.subheader("Insights (2010–2024, all teams)")
-st.markdown(
-    "- **Qualifying matters most.** The pole sitter won 51% of races and the front row won 77%. "
-    "Only 4 of 305 races were won from outside the top 10.\n"
-    "- **Grid predicts the finish.** For classified finishers r = 0.78, and two in three finish within "
-    "3 places of where they started.\n"
-    "- **One team rules each era.** Mercedes won 102 of 138 races from 2014 to 2020, and Red Bull won 21 of 22 in 2023.\n"
-    "- **Cars are far more reliable.** About half of all starters retired until the 1980s. In the 2020s it is 14%."
-)
+#DNF rate per season
+dnf_year = starters.groupby('year')['dnf'].mean() * 100
+mech_year = starters.groupby('year')['dnf_type'].apply(lambda x: (x == 'Mechanical').mean()) * 100
+dnf_df = pd.DataFrame({'All DNFs': dnf_year, 'Mechanical only': mech_year})
 
-# ------------------------------------------------------------------ model widget
-st.subheader("Predict podium chance")
-model, top_teams, model_cols = train_podium_model(df)
-m1, m2, m3, m4 = st.columns([1, 1, 1, 1])
-grid_in = m1.slider("Grid slot", 1, 20, 3)
-team_in = m2.selectbox("Team", top_teams + ["Other"])
-year_in = m3.slider("Season", 2010, 2024, 2024)
-new_row = pd.get_dummies(pd.DataFrame({"grid_clean": [grid_in], "team_group": [team_in], "year": [year_in]}))
-new_row = new_row.reindex(columns=model_cols, fill_value=0)
-prob = model.predict_proba(new_row)[0, 1]
-m4.metric("Podium chance", f"{prob:.0%}")
-st.caption("Logistic regression trained on 2010–2024 starters (grid, team, year). "
-           "It is a simple model, so treat the number as a rough guide.")
+fig = px.line(dnf_df, markers=True, title='DNF rate among starters',
+              labels={'year': 'Season', 'value': '% of starters', 'variable': ''},
+              color_discrete_sequence=[red, 'white'])
+fig.update_layout(template='plotly_dark', legend=dict(orientation='h', y=-0.25))
+col1.plotly_chart(fig)
 
-# ------------------------------------------------------------------ data
-st.subheader("Data preview")
-st.dataframe(f.head(100), hide_index=True)
+#podium rate by grid slot
+top10_grid = filtered[(filtered['grid_clean'] >= 1) & (filtered['grid_clean'] <= 10)]
+podium_rate = top10_grid.groupby('grid_clean')['podium'].mean() * 100
+podium_rate = podium_rate.reindex(range(1, 11)).fillna(0)
 
-st.subheader("Summary statistics")
-num_cols = ["grid_clean", "positionOrder", "points", "laps", "fastest_lap_sec", "fastestLapSpeed"]
-st.dataframe(f[num_cols].describe().round(2))
+fig = px.bar(x=['P' + str(i) for i in range(1, 11)], y=podium_rate.values,
+             text=[str(round(v)) + '%' for v in podium_rate],
+             title='Podium rate by grid slot', labels={'x': 'Grid slot', 'y': 'Podium rate (%)'})
+fig.update_traces(marker_color=[red] + ['grey'] * 9, textposition='outside')
+fig.update_layout(template='plotly_dark', yaxis_range=[0, 105])
+col2.plotly_chart(fig)
+
+# ---------------- insights ----------------
+st.subheader('Insights (2010–2024, all teams)')
+st.markdown('''
+- **Qualifying matters most.** The pole sitter won 51% of races and the front row won 77%. Only 4 of 305 races were won from outside the top 10.
+- **Grid predicts the finish.** For classified finishers r = 0.78, and two in three finish within 3 places of where they started.
+- **One team rules each era.** Mercedes won 102 of 138 races from 2014 to 2020, and Red Bull won 21 of 22 in 2023.
+- **Cars are far more reliable.** About half of all starters retired until the 1980s. In the 2020s it is 14%.
+''')
+
+
+# ---------------- predict podium chance ----------------
+#same model as the notebook: podium from grid, team and year (2010-2024)
+@st.cache_resource
+def train_model():
+    model_df = df[(df['year'] >= 2010) & (df['starter'] == True) & (df['grid_clean'].notna())].copy()
+    top_teams = model_df.groupby('team')['points'].sum().sort_values(ascending=False).head(6).index.tolist()
+    model_df['team_group'] = model_df['team']
+    model_df.loc[~model_df['team'].isin(top_teams), 'team_group'] = 'Other'
+
+    X = pd.get_dummies(model_df[['grid_clean', 'team_group', 'year']])
+    y = model_df['podium']
+    model = LogisticRegression(max_iter=1000)
+    model.fit(X, y)
+    return model, top_teams, X.columns
+
+
+model, top_teams, model_columns = train_model()
+
+st.subheader('Predict podium chance')
+col1, col2, col3, col4 = st.columns(4)
+grid_in = col1.slider('Grid slot', 1, 20, 3)
+team_in = col2.selectbox('Team', top_teams + ['Other'])
+year_in = col3.slider('Season', 2010, 2024, 2024)
+
+new_row = pd.DataFrame({'grid_clean': [grid_in], 'team_group': [team_in], 'year': [year_in]})
+new_row = pd.get_dummies(new_row).reindex(columns=model_columns, fill_value=0)
+chance = model.predict_proba(new_row)[0, 1]
+col4.metric('Podium chance', str(round(chance * 100)) + '%')
+st.caption('Logistic regression trained on 2010–2024 starters (grid, team, year). '
+           'It is a simple model, so treat the number as a rough guide.')
+
+# ---------------- data ----------------
+st.subheader('Data preview')
+st.dataframe(filtered.head(100), hide_index=True)
+
+st.subheader('Summary statistics')
+st.dataframe(filtered[['grid_clean', 'positionOrder', 'points', 'laps', 'fastest_lap_sec', 'fastestLapSpeed']].describe().round(2))
