@@ -1,7 +1,8 @@
 # what the dashboard needs to run (Streamlit Cloud reads this file)
+# ranges instead of exact versions, so it installs on any Python from 3.11 to 3.14
 streamlit==1.50.0
-pandas==2.3.2
-numpy==2.3.3
-scikit-learn==1.7.2
-anthropic==2.3.0
-segno==1.6.6
+pandas>=2.2,<3
+numpy>=2.0,<3
+scikit-learn>=1.5,<2
+anthropic>=2.3,<3
+segno>=1.6
