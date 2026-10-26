@@ -275,15 +275,15 @@ def chibi_svg(size=220, mood='happy', uid='p', head_only=False, animated=True):
         mouth = ('<path d="M92 136 Q100 145 108 136" stroke="#7A2E22" stroke-width="2.6" fill="none" '
                  'stroke-linecap="round"/>')
     eye = ('<ellipse cx="{x}" cy="118" rx="10.5" ry="13.5" fill="#2A1712"/>'
-           '<ellipse cx="{x}" cy="121.5" rx="7.5" ry="8.5" fill="#8A4526"/>'
-           '<circle cx="{hx}" cy="112" r="3.8" fill="#fff"/><circle cx="{sx}" cy="124.5" r="1.7" fill="#fff"/>')
+           '<g class="pupil"><ellipse cx="{x}" cy="121.5" rx="7.5" ry="8.5" fill="#8A4526"/>'
+           '<circle cx="{hx}" cy="112" r="3.8" fill="#fff"/><circle cx="{sx}" cy="124.5" r="1.7" fill="#fff"/></g>')
     eyes = eye.format(x=78, hx=74, sx=81.5) + eye.format(x=122, hx=118, sx=125.5)
     # the face she makes while being carried around: happy squint and a big open smile
     wheee = ('<path d="M67 121 Q78 107 89 121" stroke="#2A1712" stroke-width="4" fill="none" stroke-linecap="round"/>'
              '<path d="M111 121 Q122 107 133 121" stroke="#2A1712" stroke-width="4" fill="none" stroke-linecap="round"/>'
              '<path d="M89 133 Q100 153 111 133 Z" fill="#7A2E22"/><path d="M94 142 Q100 149 106 142 Z" fill="#FF8C9A"/>'
-             '<path d="M40 112 l-8 -3 M40 120 l-9 1 M160 112 l8 -3 M160 120 l9 1" stroke="#FF2B17" stroke-width="2.4" '
-             'stroke-linecap="round"/>')
+             '<path class="speed" d="M40 112 l-8 -3 M40 120 l-9 1 M160 112 l8 -3 M160 120 l9 1" stroke="#FF2B17" '
+             'stroke-width="2.4" stroke-linecap="round"/>')
     cls = 'chibi animated' if animated else 'chibi'
     return f"""<svg class="{cls}" width="{size}" height="{height}" viewBox="{view}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Polly, a chibi girl in a red racing cap and dress">
 <defs><pattern id="{chk}" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#fff"/><rect width="4" height="4" fill="#15151a"/><rect x="4" y="4" width="4" height="4" fill="#15151a"/></pattern></defs>
@@ -312,9 +312,9 @@ def chibi_svg(size=220, mood='happy', uid='p', head_only=False, animated=True):
 <path d="M37 87 Q100 71 163 87 Q171 93 161 97 Q100 85 39 97 Q29 93 37 87 Z" fill="#C41C0E"/>
 <path d="M45 95 Q38 128 50 152 Q54 126 63 101 Z" fill="#3B2420"/>
 <path d="M155 95 Q162 128 150 152 Q146 126 137 101 Z" fill="#3B2420"/>
-<ellipse cx="63" cy="135" rx="8.5" ry="4.8" fill="#FF7A90" opacity=".55"/><ellipse cx="137" cy="135" rx="8.5" ry="4.8" fill="#FF7A90" opacity=".55"/>
+<g class="look"><g class="blush"><ellipse cx="63" cy="135" rx="8.5" ry="4.8" fill="#FF7A90"/><ellipse cx="137" cy="135" rx="8.5" ry="4.8" fill="#FF7A90"/></g>
 <g class="face-normal"><g class="eyes">{eyes}</g>{mouth}</g>
-<g class="face-drag">{wheee}</g>
+<g class="face-drag">{wheee}</g></g>
 </g>
 <g class="arm-flag"><path d="M118 160 Q140 164 157 147" stroke="{RED}" stroke-width="9" stroke-linecap="round" fill="none"/>
 <g class="flag"><line x1="160" y1="148" x2="167" y2="88" stroke="#D9D9DE" stroke-width="3" stroke-linecap="round"/>
@@ -350,6 +350,34 @@ CHIBI_CSS = """
 @keyframes polly-wave { from { transform: rotate(-12deg); } to { transform: rotate(10deg); } }
 @keyframes polly-arm { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(10deg); } }
 @keyframes polly-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+
+.chibi .blush { opacity: .55; transition: opacity .4s ease; }
+.chibi .look, .chibi .pupil { transition: transform .08s linear; }
+
+/* mouse nearby: she notices, bounces faster, blushes, waves harder */
+#polly-float.near .chibi .bob { animation-duration: 1.15s; }
+#polly-float.near .chibi .arm-flag { animation-duration: 0.32s; }
+#polly-float.near .chibi .tail-l, #polly-float.near .chibi .tail-r { animation-duration: 0.7s; }
+#polly-float.near .chibi .blush { opacity: .85; }
+#polly-float .polly-exclaim { position: absolute; left: 62%; top: -6px; width: 26px; height: 26px; border-radius: 50%;
+  background: #FF2B17; color: #fff; font: 800 17px/26px -apple-system, BlinkMacSystemFont, sans-serif; text-align: center;
+  box-shadow: 0 4px 14px rgba(255,43,23,.55); opacity: 0; transform: scale(0); pointer-events: none; }
+#polly-float.notice .polly-exclaim { animation: polly-exclaim .9s cubic-bezier(.3, 1.7, .5, 1) forwards; }
+@keyframes polly-exclaim { 0% { opacity: 0; transform: scale(0) translateY(6px); } 25% { opacity: 1; transform: scale(1.2) translateY(-4px); }
+  45% { transform: scale(1) translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(.9) translateY(-6px); } }
+#polly-float.notice .chibi .bob { animation: polly-hop .45s ease-out; }
+@keyframes polly-hop { 0% { transform: scale(1.06, .92); } 40% { transform: translateY(-14px) scale(.96, 1.05); } 100% { transform: translateY(0); } }
+
+/* mouse right on her: giggles with closed happy eyes, wiggles, hearts float up */
+#polly-float.close:not(.dragging) .face-normal { display: none; }
+#polly-float.close:not(.dragging) .face-drag { display: inline; }
+#polly-float.close:not(.dragging) .face-drag .speed { display: none; }
+#polly-float.close:not(.dragging) .chibi { animation: polly-giggle .5s ease-in-out infinite; transform-origin: 50% 95%; }
+@keyframes polly-giggle { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg) scale(1.02); } }
+#polly-float .polly-heart { position: absolute; width: 16px; height: 16px; pointer-events: none;
+  animation: polly-heart 1.3s ease-out forwards; }
+@keyframes polly-heart { 0% { opacity: 0; transform: translate(0, 0) scale(.4); } 15% { opacity: 1; transform: translate(0, -8px) scale(1); }
+  100% { opacity: 0; transform: translate(var(--drift, 0px), -70px) scale(.8) rotate(var(--spin, 0deg)); } }
 
 /* being carried: wheee face, kicking legs, flying pigtails, frantic flag */
 #polly-float.dragging .face-normal { display: none; }
@@ -445,6 +473,7 @@ POLLY_BOOT = r"""(function () {
     el.setAttribute('role', 'button');
     el.setAttribute('aria-label', 'Polly, your F1 assistant. Double-click to chat, drag to move.');
     el.innerHTML = '<div class="polly-hint">Double-click me to chat!<span>Drag me anywhere</span></div>'
+                 + '<div class="polly-exclaim">!</div>'
                  + '<div class="polly-swing"><div class="polly-svg">' + SVG + '</div></div>';
     doc.body.appendChild(el);
 
@@ -484,7 +513,63 @@ POLLY_BOOT = r"""(function () {
     // she hangs from the cursor like a pendulum: moving fast swings her, a spring brings her back
     const swing = el.querySelector('.polly-swing'), body = el.querySelector('.polly-svg');
     let angle = 0, spin = 0, target = 0, lastX = null, lastT = 0;
+    // eyes and face follow the mouse; getting close makes her react
+    let mx = null, my = null, near = false, close = false, lastHeart = 0, noticeTimer = null;
+    const eyeAt = [[78, 118], [122, 118]], eyeNow = [[0, 0], [0, 0]], lookNow = [0, 0];
+    doc.addEventListener('pointermove', e => { mx = e.clientX; my = e.clientY; }, { passive: true });
+    doc.documentElement.addEventListener('mouseleave', () => { mx = null; });
+    function heart() {
+      const h = doc.createElement('div');
+      h.className = 'polly-heart';
+      h.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16"><path d="M8 14 C2 9.5 1 6.5 3 4.2 C4.6 2.4 7 3 8 5 C9 3 11.4 2.4 13 4.2 C15 6.5 14 9.5 8 14Z" fill="' + (Math.random() < .5 ? '#FF2B17' : '#FF7A90') + '"/></svg>';
+      h.style.left = (30 + Math.random() * 55) + '%';
+      h.style.top = (8 + Math.random() * 18) + '%';
+      h.style.setProperty('--drift', (Math.random() * 40 - 20) + 'px');
+      h.style.setProperty('--spin', (Math.random() * 50 - 25) + 'deg');
+      h.addEventListener('animationend', () => h.remove());
+      el.appendChild(h);
+    }
+    function follow() {
+      const svg = el.querySelector('.polly-svg svg');
+      if (!svg) return;
+      const r = svg.getBoundingClientRect(), k = r.width / 200;
+      const dragging = el.classList.contains('dragging');
+      const cx = r.left + 100 * k, cy = r.top + 120 * k;
+      const d = (mx === null) ? Infinity : Math.hypot(mx - cx, my - cy);
+
+      // pupils: point at the cursor, easing in so they glide instead of snap
+      el.querySelectorAll('.pupil').forEach((p, i) => {
+        let tx = 0, ty = 0;
+        if (mx !== null && !dragging) {
+          const ex = r.left + eyeAt[i][0] * k, ey = r.top + eyeAt[i][1] * k;
+          const dx = mx - ex, dy = my - ey, dist = Math.hypot(dx, dy) || 1, reach = Math.min(1, dist / 120);
+          tx = dx / dist * 3.2 * reach; ty = dy / dist * 2.6 * reach;
+        }
+        eyeNow[i][0] += (tx - eyeNow[i][0]) * 0.25; eyeNow[i][1] += (ty - eyeNow[i][1]) * 0.25;
+        p.setAttribute('transform', 'translate(' + eyeNow[i][0].toFixed(2) + ' ' + eyeNow[i][1].toFixed(2) + ')');
+      });
+      // the whole face turns a little toward the cursor
+      let lx = 0, ly = 0;
+      if (mx !== null && !dragging) { lx = Math.max(-1, Math.min(1, (mx - cx) / 260)) * 4; ly = Math.max(-1, Math.min(1, (my - cy) / 260)) * 2.5; }
+      lookNow[0] += (lx - lookNow[0]) * 0.15; lookNow[1] += (ly - lookNow[1]) * 0.15;
+      const look = el.querySelector('.look');
+      if (look) look.setAttribute('transform', 'translate(' + lookNow[0].toFixed(2) + ' ' + lookNow[1].toFixed(2) + ')');
+
+      // closeness
+      const nowNear = !dragging && d < 230, nowClose = !dragging && d < 70 * k / 0.62;
+      if (nowNear && !near) {
+        el.classList.add('notice');
+        clearTimeout(noticeTimer);
+        noticeTimer = setTimeout(() => el.classList.remove('notice'), 900);
+      }
+      near = nowNear; close = nowClose;
+      el.classList.toggle('near', near);
+      el.classList.toggle('close', close);
+      if (close && performance.now() - lastHeart > 420) { lastHeart = performance.now(); heart(); }
+    }
+
     (function tick() {
+      follow();
       spin = (spin + (target - angle) * 0.09) * 0.86;
       angle += spin;
       target *= 0.88;
