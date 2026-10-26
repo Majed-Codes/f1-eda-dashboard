@@ -283,15 +283,16 @@ story += [p("5. Dashboard Overview", h1),
                     "<b>Headline:</b> the main question with a short answer that changes with the filters, and four stat "
                     "tiles: wins from pole, wins from the front row, finishers within 3 places of their grid slot, and DNF "
                     "rate. Each tile shows how far the selection is from the 1950-2024 value.",
-                    "<b>Qualifying tab:</b> win, podium or points rate by grid slot (switchable), a grid vs result heatmap "
-                    "and the distribution of places gained or lost.",
-                    "<b>Dominance tab:</b> the leading team's share of wins in every season, the teams with the most wins, "
-                    "and a table of the top team in each era.",
+                    "<b>Qualifying tab:</b> win, podium or points rate by grid slot (switchable), a flow diagram from grid "
+                    "position to the result (win, podium, points, no points, DNF), a grid vs result heatmap and the "
+                    "distribution of places gained or lost.",
+                    "<b>Dominance tab:</b> a bar chart race of constructor wins that plays season by season, the leading "
+                    "team's share of wins in every season (in team colours), and a table of the top team in each era.",
                     "<b>Reliability tab:</b> DNF rate per season (all and mechanical) and what ended the race in each decade.",
                     "<b>Drivers tab:</b> pick a driver to see starts, wins, podiums, pole starts, places gained and "
                     "podiums per season.",
                     "<b>Predict tab:</b> pick a grid slot, team and season and the logistic regression gives a podium "
-                    "chance, with the chance from every grid slot shown as a bar chart.",
+                    "chance on an animated gauge, with the chance from every grid slot shown as a bar chart.",
                     "<b>Play tab:</b> three F1 mini games built on real grids and results (Lights Out reaction starts, "
                     "Pit Stop, and Grid Dash, a top-down race from a real grid slot). They can be played solo, by two "
                     "players on one device, or as an online championship that friends join from their phones.",
@@ -299,11 +300,13 @@ story += [p("5. Dashboard Overview", h1),
                     "anywhere, and a double-click opens a chat window. She answers questions about the data by calling "
                     "tools that query clean_data.csv, so the numbers come from the data and not from memory.",
                     "<b>Data tab:</b> a preview of the filtered rows, summary statistics and a CSV download.",
-                    "Every chart has hover details, and each tab ends with a short insight written from the filtered data."]),
+                    "All charts are animated (drawn with ECharts): they grow in when a tab opens and again when the "
+                    "filters change, and every bar, line and cell shows its numbers on hover. The headline numbers "
+                    "count up. Each tab ends with a short insight written from the filtered data."]),
           Spacer(1, 6),
           screenshot(1, "Figure 11. The filter bar, the headline answer and the four stat tiles."),
-          screenshot(2, "Figure 12. Qualifying tab: rate by grid slot, grid vs result heatmap and places gained."),
-          screenshot(3, "Figure 13. Predict tab: podium chance for a chosen grid slot, team and season."),
+          screenshot(2, "Figure 12. Qualifying tab: rate by grid slot and the flow from grid position to the result."),
+          screenshot(3, "Figure 13. Predict tab: the podium chance gauge for a chosen grid slot, team and season."),
           PageBreak()]
 
 # 8. Insights & conclusion
@@ -361,7 +364,7 @@ story += [p("7. References", h1),
                     "NumPy: https://numpy.org",
                     "Matplotlib: https://matplotlib.org",
                     "seaborn: https://seaborn.pydata.org",
-                    "Plotly: https://plotly.com/python/",
+                    "Apache ECharts (dashboard charts): https://echarts.apache.org",
                     "Streamlit: https://streamlit.io",
                     "scikit-learn: https://scikit-learn.org",
                     "ReportLab (used to build this PDF): https://www.reportlab.com",

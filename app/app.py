@@ -2,10 +2,10 @@ import os
 
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
 import streamlit as st
 from sklearn.linear_model import LogisticRegression
 
+import charts
 import game
 import polly
 
@@ -73,6 +73,15 @@ st.markdown(f"""
 .stat-label {{ color: {MUTED}; font-size: 14px; font-weight: 500; margin-bottom: 10px; }}
 .stat-value {{ color: {INK}; font-size: 46px; font-weight: 600; letter-spacing: -0.03em; line-height: 1; }}
 .stat-value.accent {{ color: {RED}; }}
+@property --n {{ syntax: '<integer>'; initial-value: 0; inherits: false; }}
+.count {{ --n: var(--to); counter-reset: n var(--n); animation: count-up 1.6s cubic-bezier(.16, 1, .3, 1) backwards; }}
+.count::after {{ content: counter(n); }}
+@keyframes count-up {{ from {{ --n: 0; }} }}
+.stat {{ animation: stat-in .7s cubic-bezier(.2, .8, .2, 1) backwards; }}
+.stat:nth-child(2) {{ animation-delay: .07s; }} .stat:nth-child(3) {{ animation-delay: .14s; }}
+.stat:nth-child(4) {{ animation-delay: .21s; }} .stat:nth-child(5) {{ animation-delay: .28s; }}
+@keyframes stat-in {{ from {{ opacity: 0; transform: translateY(14px); }} }}
+@media (prefers-reduced-motion: reduce) {{ .count, .stat {{ animation: none; }} }}
 .stat-note {{ color: {FAINT}; font-size: 13px; margin-top: 10px; min-height: 18px; }}
 
 .section-title {{ color: {INK}; font-size: clamp(26px, 3vw, 36px); font-weight: 700; letter-spacing: -0.025em; line-height: 1.15; margin: 8px 0 10px 0; }}
@@ -131,7 +140,17 @@ def pct(x):
     return str(round(x * 100)) + '%'
 
 
+def counted(value):
+    """Whole numbers and percentages count up from zero when they appear."""
+    text = str(value)
+    digits, suffix = (text[:-1], '%') if text.endswith('%') else (text, '')
+    if digits.isdigit() and int(digits) < 100000:
+        return f'<span class="count" style="--to:{int(digits)}"></span>{suffix}'
+    return text
+
+
 def stat_card(label, value, note='', accent=False):
+    value = counted(value)
     value_class = 'stat-value accent' if accent else 'stat-value'
     card_class = 'stat glow' if accent else 'stat'
     return (f'<div class="{card_class}"><div class="stat-label">{label}</div>'
@@ -149,24 +168,6 @@ def section(eyebrow, title, lede):
 
 def insight(text):
     st.markdown(f'<div class="insight">{text}</div>', unsafe_allow_html=True)
-
-
-def style(fig, height=380, title=''):
-    # same quiet look for every chart: no background, faint grid, one font
-    fig.update_layout(
-        height=height, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(family=FONT, color=MUTED, size=13),
-        title=dict(text=title, x=0, xanchor='left', font=dict(size=16, color=INK)),
-        margin=dict(l=10, r=16, t=52 if title else 12, b=10),
-        hoverlabel=dict(bgcolor='#1C1C22', bordercolor='#2C2C33', font=dict(family=FONT, color=INK, size=13)),
-        showlegend=False, bargap=0.25)
-    fig.update_xaxes(showgrid=False, zeroline=False, linecolor='rgba(255,255,255,0.12)', ticks='', automargin=True)
-    fig.update_yaxes(gridcolor='rgba(255,255,255,0.06)', zeroline=False, ticks='', automargin=True)
-    return fig
-
-
-def show(fig):
-    st.plotly_chart(fig, theme=None, config={'displayModeBar': False})
 
 
 # ---------------- filter bar ----------------
@@ -302,43 +303,33 @@ with tab_q:
     else:
         hit = grid_starts['points'] > 0
     rate = hit.groupby(grid_starts['grid_clean']).agg(['mean', 'size']).reindex(range(1, 21))
+    charts.rate_by_slot([None if pd.isna(v) else v * 100 for v in rate['mean']],
+                        [0 if pd.isna(n) else int(n) for n in rate['size']], outcome)
 
-    fig = go.Figure(go.Bar(
-        x=[f'P{i}' for i in range(1, 21)], y=rate['mean'] * 100, customdata=rate['size'],
-        marker=dict(color=[RED] + [GREY] * 19, cornerradius=4),
-        hovertemplate='From %{x}: %{y:.0f}% ' + outcome.lower() + ' rate<br>%{customdata} starts<extra></extra>'))
-    fig.update_yaxes(ticksuffix='%', rangemode='tozero')
-    show(style(fig, 340, f'{outcome} rate by grid slot'))
+    # grid groups to Sunday results
+    g = grid_starts.copy()
+    g['from'] = pd.cut(g['grid_clean'], [0, 1, 3, 6, 10, 99], labels=['P1', 'P2–3', 'P4–6', 'P7–10', 'P11+'])
+    g['to'] = np.select([g['win'], g['podium'], g['points'] > 0, g['finished']],
+                        ['Win', 'Podium', 'Points', 'No points'], 'DNF')
+    flows = g.groupby(['from', 'to'], observed=True).size().to_dict()
+    charts.grid_to_result(flows)
 
     col1, col2 = st.columns([1.35, 1], gap='large')
     with col1:
-        g = grid_starts.copy()
         g['result'] = np.where(g['finished'], g['positionOrder'].clip(upper=21), 22)
         table = pd.crosstab(g['grid_clean'].astype(int), g['result']).reindex(
             index=range(1, 21), columns=range(1, 23), fill_value=0)
         share = table.div(table.sum(axis=1).replace(0, np.nan), axis=0) * 100
         share = share.drop(columns=21)  # finishing 21st or lower is rare, so it is left out of the picture
-        x_labels = [str(i) for i in range(1, 21)] + ['DNF']
-        fig = go.Figure(go.Heatmap(
-            z=share.values, x=x_labels, y=[f'P{i}' for i in range(1, 21)], zmin=0, zmax=50, xgap=1, ygap=1,
-            colorscale=[[0, '#111115'], [0.25, '#4A1510'], [0.6, RED], [1, '#FFD7D0']],
-            colorbar=dict(thickness=8, outlinewidth=0, ticksuffix='%', len=0.8),
-            hovertemplate='Started %{y}, finished %{x}<br>%{z:.0f}% of starts<extra></extra>'))
-        fig.update_yaxes(autorange='reversed', title='Grid slot', gridcolor='rgba(0,0,0,0)')
-        fig.update_xaxes(title='Result', type='category', tickangle=0, tickfont=dict(size=10))
-        show(style(fig, 470, 'Where each grid slot finishes'))
+        matrix = [[None if pd.isna(v) else float(v) for v in row] for row in share.values]
+        charts.heatmap(matrix, [str(i) for i in range(1, 21)] + ['DNF'])
     with col2:
         gained = (finishers['grid_clean'] - finishers['positionOrder']).clip(-15, 15)
-        counts = gained.value_counts().reindex(range(-15, 16), fill_value=0)
-        fig = go.Figure(go.Bar(
-            x=counts.index, y=counts.values,
-            marker=dict(color=[RED if abs(i) <= 3 else GREY for i in counts.index], cornerradius=3),
-            hovertemplate='%{x:+d} places: %{y} finishes<extra></extra>'))
-        fig.update_xaxes(title='Places gained (+) or lost (−)', dtick=5)
-        show(style(fig, 470, 'Places gained on Sunday'))
+        charts.places_gained(gained.value_counts().reindex(range(-15, 16), fill_value=0))
 
     insight(f'<b>{pct(within3)}</b> of classified finishers end within three places of where they started (red bars). '
-            f'The bright diagonal in the heatmap is the same story: Saturday sets the order and Sunday tweaks it.')
+            f'Follow the flows: almost every win comes from the front, and the back of the grid mostly feeds '
+            f'"no points" and DNF.')
 
 # ---------------- dominance ----------------
 with tab_d:
@@ -354,28 +345,21 @@ with tab_d:
 
         section('Sector 2 · Dominance', 'Every era has an owner.',
                 f'<b>{top_team}</b> won the most races in this selection and led <b>{top_seasons}</b> of '
-                f'{len(leaders)} seasons. Each bar is the leading team\'s share of that season\'s wins.')
+                f'{len(leaders)} seasons. Watch the wins pile up, season by season.')
 
-        fig = go.Figure(go.Bar(
-            x=leaders.index, y=leaders['share'], customdata=np.stack([leaders['team'], leaders['wins'],
-                                                                      totals.reindex(leaders.index)], axis=1),
-            marker=dict(color=[RED if t == top_team else GREY for t in leaders['team']], cornerradius=3),
-            hovertemplate='%{x}: %{customdata[0]}<br>%{customdata[1]} of %{customdata[2]} wins (%{y:.0f}%)<extra></extra>'))
-        fig.update_yaxes(ticksuffix='%', range=[0, 100])
-        show(style(fig, 340, f'Leading team\'s share of wins per season · red = {top_team}'))
+        # bar chart race: running total of wins for the ten most successful teams in the selection
+        race_teams = wins['team'].value_counts().head(10).index.tolist()
+        running = season[season['team'].isin(race_teams)].pivot(index='year', columns='team', values='wins') \
+            .reindex(index=range(int(leaders.index.min()), int(leaders.index.max()) + 1), columns=race_teams) \
+            .fillna(0).cumsum()
+        frames = [{'year': int(y), 'values': [int(v) for v in row]} for y, row in running.iterrows()]
+        charts.bar_race(frames, race_teams, [game.TEAM_COLORS.get(t, '#8E8E93') for t in race_teams])
 
-        col1, col2 = st.columns([1, 1.1], gap='large')
+        col1, col2 = st.columns([1.4, 1], gap='large')
         with col1:
-            team_wins = wins['team'].value_counts().head(10).sort_values()
-            fig = go.Figure(go.Bar(
-                x=team_wins.values, y=team_wins.index, orientation='h', text=team_wins.values,
-                textposition='outside', cliponaxis=False,
-                marker=dict(color=[GREY] * (len(team_wins) - 1) + [RED], cornerradius=3),
-                hovertemplate='%{y}: %{x} wins<extra></extra>'))
-            fig.update_xaxes(showticklabels=False)
-            fig.update_yaxes(showgrid=False)
-            fig.update_traces(textfont=dict(color=MUTED))
-            show(style(fig, 400, 'Most race wins'))
+            charts.leader_share(leaders.index.tolist(), leaders['team'].tolist(), leaders['wins'].tolist(),
+                                totals.reindex(leaders.index).tolist(), leaders['share'].tolist(),
+                                [game.TEAM_COLORS.get(t, '#8E8E93') for t in leaders['team']])
         with col2:
             eras = [('1950s', 1950, 1959), ('1960s', 1960, 1969), ('1970s', 1970, 1979), ('1980s', 1980, 1989),
                     ('1990s', 1990, 1999), ('2000s', 2000, 2009), ('2010–13', 2010, 2013),
@@ -388,8 +372,8 @@ with tab_d:
                 counts = era_wins['team'].value_counts()
                 rows.append({'Era': name, 'Top team': counts.index[0], 'Wins': f'{counts.iloc[0]} of {counts.sum()}',
                              'Share': counts.iloc[0] / counts.sum() * 100})
-            st.markdown(f'<div style="color:{INK};font-size:16px;margin:4px 0 12px 0">Top team by era</div>',
-                        unsafe_allow_html=True)
+            st.markdown(f'<div style="color:{INK};font-size:16px;font-weight:600;margin:4px 0 12px 0">Top team by era'
+                        '</div>', unsafe_allow_html=True)
             st.dataframe(pd.DataFrame(rows), hide_index=True, height=35 * (len(rows) + 1) + 3,
                          column_config={'Share': st.column_config.ProgressColumn(
                              'Share of wins', format='%.0f%%', min_value=0, max_value=100)})
@@ -407,36 +391,11 @@ with tab_r:
     section('Sector 3 · Reliability', 'Cars stopped breaking.',
             f'In {first}, <b>{by_year.loc[first, "dnf"]:.0f}%</b> of starters failed to finish. By {last} it was '
             f'<b>{by_year.loc[last, "dnf"]:.0f}%</b>. Widen the season range to 1950 to see the full change.')
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=by_year.index, y=by_year['dnf'], mode='lines', name='All DNFs',
-                             line=dict(color=RED, width=2.5), hovertemplate='%{x}: %{y:.0f}% of starters<extra>All DNFs</extra>'))
-    fig.add_trace(go.Scatter(x=by_year.index, y=by_year['mech'], mode='lines', name='Mechanical',
-                             line=dict(color=INK, width=2), hovertemplate='%{x}: %{y:.0f}% of starters<extra>Mechanical</extra>'))
-    fig.add_annotation(x=last, y=by_year.loc[last, 'dnf'], text='All DNFs', showarrow=False, xanchor='left',
-                       xshift=8, font=dict(color=RED))
-    fig.add_annotation(x=last, y=by_year.loc[last, 'mech'], text='Mechanical', showarrow=False, xanchor='left',
-                       xshift=8, font=dict(color=INK))
-    fig.update_yaxes(ticksuffix='%', rangemode='tozero')
-    fig.update_xaxes(range=[first - 0.5, last + 0.5])
-    fig.update_layout(hovermode='x unified')
-    fig = style(fig, 360, 'Share of starters who did not finish')
-    fig.update_layout(margin=dict(r=96))
-    show(fig)
+    charts.dnf_lines(by_year.index.tolist(), by_year['dnf'].tolist(), by_year['mech'].tolist())
 
     causes = starters[starters['dnf']].groupby('decade')['dnf_type'].value_counts(normalize=True).unstack().fillna(0) * 100
-    fig = go.Figure()
-    for cause, color in [('Mechanical', RED), ('Crash/collision', '#8E8E93'), ('Other', GREY)]:
-        if cause in causes.columns:
-            fig.add_trace(go.Bar(x=[f'{d}s' for d in causes.index], y=causes[cause], name=cause,
-                                 marker=dict(color=color), hovertemplate='%{x}: %{y:.0f}% ' + cause.lower() + '<extra></extra>'))
-    fig.update_layout(barmode='stack', showlegend=True)
-    fig.update_traces(width=0.35 if len(causes) <= 3 else None)
-    fig.update_yaxes(ticksuffix='%', range=[0, 100])
-    fig = style(fig, 340, 'What ended the race, by decade')
-    fig.update_layout(showlegend=True, legend=dict(orientation='h', y=1.02, x=1, xanchor='right', yanchor='bottom',
-                                                   font=dict(color=MUTED)))
-    show(fig)
+    charts.causes_by_decade([f'{d}s' for d in causes.index],
+                            {c: causes[c].tolist() for c in ['Mechanical', 'Crash/collision', 'Other'] if c in causes})
 
     mech_now = causes['Mechanical'].iloc[-1] if 'Mechanical' in causes.columns else np.nan
     insight(f'Mechanical failures still cause <b>{mech_now:.0f}%</b> of retirements in the {causes.index[-1]}s, '
@@ -473,14 +432,8 @@ with tab_driver:
                     f'Across all drivers in this selection the figure is {pct(starters[starters["grid_clean"] == 1]["win"].mean())}.')
 
         per_year = d.groupby('year').agg(wins=('win', 'sum'), podiums=('podium', 'sum'))
-        fig = go.Figure()
-        fig.add_trace(go.Bar(x=per_year.index, y=per_year['wins'], name='Wins', marker=dict(color=RED),
-                             hovertemplate='%{x}: %{y} wins<extra></extra>'))
-        fig.add_trace(go.Bar(x=per_year.index, y=per_year['podiums'] - per_year['wins'], name='Other podiums',
-                             marker=dict(color=GREY), hovertemplate='%{x}: %{y} other podiums<extra></extra>'))
-        fig.update_layout(barmode='stack')
-        fig = style(fig, 340, 'Podiums per season · red = wins')
-        show(fig)
+        charts.podiums_per_season(per_year.index.tolist(), per_year['wins'].tolist(),
+                                  (per_year['podiums'] - per_year['wins']).tolist())
 
 # ---------------- predict ----------------
 @st.cache_resource
@@ -514,18 +467,11 @@ def predictor():
     chance = curve[grid_in - 1]
 
     with col2:
-        st.markdown(f'<div class="stat-label" style="color:{MUTED};font-size:15px">Podium chance</div>'
-                    f'<div class="big-prob">{chance:.0f}<span>%</span></div>'
-                    f'<div class="note" style="margin-top:12px">Starting P{grid_in} for {team_in} in {year_in}. '
-                    f'Across all teams, P{grid_in} reached the podium {observed.get(grid_in, np.nan) * 100:.0f}% '
-                    f'of the time.</div>', unsafe_allow_html=True)
+        charts.gauge(chance, f'P{grid_in} · {team_in} · {year_in}')
+        st.markdown(f'<div class="note" style="text-align:center">Across all teams, P{grid_in} reached the podium '
+                    f'{observed.get(grid_in, np.nan) * 100:.0f}% of the time.</div>', unsafe_allow_html=True)
 
-    fig = go.Figure(go.Bar(
-        x=[f'P{i}' for i in range(1, 21)], y=curve,
-        marker=dict(color=[RED if i == grid_in else GREY for i in range(1, 21)], cornerradius=4),
-        hovertemplate='From %{x}: %{y:.0f}%<extra></extra>'))
-    fig.update_yaxes(ticksuffix='%', range=[0, 100])
-    show(style(fig, 300, f'Predicted podium chance by grid slot · {team_in}, {year_in}'))
+    charts.chance_curve(curve, grid_in, subtitle=f' · {team_in}, {year_in}')
     st.markdown('<div class="note">Precision 0.71 · recall 0.53 · ROC-AUC 0.92 on a held-out 20% test set. '
                 'A rough guide, not a forecast: it knows nothing about weather, strategy or upgrades.</div>',
                 unsafe_allow_html=True)

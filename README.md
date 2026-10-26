@@ -57,6 +57,9 @@ Run all cells from top to bottom. The notebook reads `data/raw/` and writes `dat
 streamlit run app/app.py
 ```
 
+The charts are animated with [Apache ECharts](https://echarts.apache.org), loaded from the jsDelivr CDN, so the
+dashboard needs an internet connection to draw them (everything else works offline).
+
 The dark/red theme is in `app/.streamlit/config.toml`. Streamlit reads the config from the folder
 you run the command in, so the same file is also at `.streamlit/config.toml` in the repo root.
 
